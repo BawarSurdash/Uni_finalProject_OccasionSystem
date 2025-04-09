@@ -1,14 +1,35 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Navbar from "./navbar";
 import { useNavigate } from "react-router-dom";
 import { FaSignOutAlt } from "react-icons/fa";
 import { motion } from "framer-motion";
+import axios from "axios";
 
 
 
 const Profile = () => {
   const [activeTab, setActiveTab] = useState("personal");
   const navigate = useNavigate();
+  const [userData, setUserData] = useState(null);
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await axios.get('http://localhost:3001/auth/user', {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        setUserData(response.data);
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+        navigate('/login');
+      }
+    };
+    
+    fetchUserData();
+  }, [navigate]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -29,7 +50,9 @@ const Profile = () => {
       <div className="max-w-4xl mx-auto p-8 mt-8 bg-white rounded-lg shadow-lg">
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h2 className="text-2xl font-semibold">Profile</h2>
+            <h2 className="text-2xl font-semibold">
+              Welcome back, {userData?.username || 'User'}!
+            </h2>
             <p className="text-gray-600">Edit and manage your personal and account information here</p>
           </div>
           {/* Logout Button */}

@@ -10,6 +10,9 @@ app.use(cors());
 const postRouter=require('./routes/Posts');
 app.use('/posts',postRouter);
 
+const userRouter=require('./routes/Users');
+app.use('/auth',userRouter);
+
 // Force sync to recreate tables with new structure
 db.sequelize.sync({ force: true }).then(()=>{
     console.log('Database has been resynced and tables recreated');

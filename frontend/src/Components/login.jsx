@@ -5,7 +5,7 @@ import axios from 'axios';
 const Login = () => {
     
     const [values, setValues] = useState({
-        email: '',
+        username: '',
         password: '',
     });
     const handleChanges = (e) => {
@@ -16,14 +16,26 @@ const Login = () => {
         console.log(values);
         e.preventDefault();
         try {
-            const response = await axios.post('http://localhost:3000/auth/login', values);
-            console.log(response);
-            if(response.status===201){
-                localStorage.setItem('token',response.data.token);
+            const response = await axios.post('http://localhost:3001/auth/login', 
+                values,
+                {
+                    headers: {
+                        accessToken: localStorage.getItem('token')
+                    }
+                }
+            );
+            
+            if(response.status === 200){
+                localStorage.setItem('token', response.data.token);
                 navigate('/');
             }
         } catch (error) {
-            console.log(error);
+            console.error('Login error:', {
+                message: error.message,
+                response: error.response?.data,
+                status: error.response?.status
+            });
+            alert(error.response?.data?.error || 'Login failed. Please try again.');
         }
     }  
 
@@ -54,16 +66,16 @@ const Login = () => {
                     <form className="space-y-6" onSubmit={handleSubmit}>
 
                         <div>
-                            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                                Email address
+                            <label htmlFor="username" className="block text-sm font-medium text-gray-700">
+                                Username
                             </label>
                             <div className="mt-1">
                                 <input
-                                    id="email"
-                                    name="email"
+                                    id="username"
+                                    name="username"
                                     onChange={handleChanges}
-                                    type="email"
-                                    autoComplete="email"
+                                    type="text"
+                                    autoComplete="username"
                                     required
                                     className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition duration-150"
                              

@@ -1,11 +1,18 @@
-import { Link } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import logo from '../assets/imgs/logo.png';
 import { CgProfile } from "react-icons/cg";
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { HiMenu, HiX } from "react-icons/hi";
 
 const Navbar = () => {
     const [isOpen, setIsOpen] = useState(false);
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+    // Check auth status on component mount
+    useEffect(() => {
+        const token = localStorage.getItem('token');
+        setIsLoggedIn(!!token);
+    }, []);
 
     const toggleMenu = () => {
         setIsOpen(!isOpen);
@@ -36,103 +43,195 @@ const Navbar = () => {
                         </button>
                     </div>
 
-                    {/* Desktop Navigation Links - Centered */}
+                    {/* Desktop Navigation Links - Unified Animation */}
                     <div className="hidden md:flex flex-grow items-center justify-center space-x-8">
-                        <Link to="/" className="relative text-gray-700 hover:text-orange-500 px-3 py-2 text-sm font-medium transition-all duration-300 group">
-                            Home
-                            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-orange-500 transition-all duration-300 group-hover:w-full"></span>
-                        </Link>
-                        <Link to="/about" className="relative text-gray-700 hover:text-orange-500 px-3 py-2 text-sm font-medium transition-all duration-300 group">
-                            About Us
-                            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-orange-500 transition-all duration-300 group-hover:w-full"></span>
-                        </Link>
-                        <Link to="/events" className="relative text-gray-700 hover:text-orange-500 px-3 py-2 text-sm font-medium transition-all duration-300 group">
-                            Latest Events
-                            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-orange-500 transition-all duration-300 group-hover:w-full"></span>
-                        </Link>
-                        <Link to="/services" className="relative text-gray-700 hover:text-orange-500 px-3 py-2 text-sm font-medium transition-all duration-300 group">
-                            Services
-                            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-orange-500 transition-all duration-300 group-hover:w-full"></span>
-                        </Link>
-                        <Link to="/contact" className="relative text-gray-700 hover:text-orange-500 px-3 py-2 text-sm font-medium transition-all duration-300 group">
-                            Contact
-                            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-orange-500 transition-all duration-300 group-hover:w-full"></span>
-                        </Link>
+                        <NavLink 
+                            to="/" 
+                            className={({ isActive }) => 
+                                `relative px-3 py-2 text-sm font-medium transition-all duration-300 ${
+                                    isActive ? 'text-orange-500' : 
+                                    'text-gray-700 hover:text-orange-500 hover:-translate-y-0.5 hover:shadow-sm'
+                                }`
+                            }
+                        >
+                            <span className="block transition-all duration-300 hover:skew-y-2">
+                                Home
+                            </span>
+                        </NavLink>
+                        <NavLink 
+                            to="/about" 
+                            className={({ isActive }) => 
+                                `relative px-3 py-2 text-sm font-medium transition-all duration-300 ${
+                                    isActive ? 'text-orange-500' : 
+                                    'text-gray-700 hover:text-orange-500 hover:-translate-y-0.5 hover:shadow-sm'
+                                }`
+                            }
+                        >
+                            <span className="block transition-all duration-300 hover:skew-y-2">
+                                About Us
+                            </span>
+                        </NavLink>
+                        <NavLink 
+                            to="/events" 
+                            className={({ isActive }) => 
+                                `relative px-3 py-2 text-sm font-medium transition-all duration-300 ${
+                                    isActive ? 'text-orange-500' : 
+                                    'text-gray-700 hover:text-orange-500 hover:-translate-y-0.5 hover:shadow-sm'
+                                }`
+                            }
+                        >
+                            <span className="block transition-all duration-300 hover:skew-y-2">
+                                Latest Events
+                            </span>
+                        </NavLink>
+                        <NavLink 
+                            to="/services" 
+                            className={({ isActive }) => 
+                                `relative px-3 py-2 text-sm font-medium transition-all duration-300 ${
+                                    isActive ? 'text-orange-500' : 
+                                    'text-gray-700 hover:text-orange-500 hover:-translate-y-0.5 hover:shadow-sm'
+                                }`
+                            }
+                        >
+                            <span className="block transition-all duration-300 hover:skew-y-2">
+                                Services
+                            </span>
+                        </NavLink>
+                        <NavLink 
+                            to="/contact" 
+                            className={({ isActive }) => 
+                                `relative px-3 py-2 text-sm font-medium transition-all duration-300 ${
+                                    isActive ? 'text-orange-500' : 
+                                    'text-gray-700 hover:text-orange-500 hover:-translate-y-0.5 hover:shadow-sm'
+                                }`
+                            }
+                        >
+                            <span className="block transition-all duration-300 hover:skew-y-2">
+                                Contact
+                            </span>
+                        </NavLink>
                     </div>
 
-                    {/* Profile Icon and Auth Buttons */}
+                    {/* Auth Buttons - Unified Scale Effect */}
                     <div className="hidden md:flex items-center space-x-4">
-                        <Link to="/login" className="text-gray-700 hover:text-white hover:bg-orange-500 px-4 py-2 text-sm font-medium transition-all duration-300 rounded-md border border-transparent hover:border-orange-500">
-                            Login
-                        </Link>
-                        <Link to="/signup" className="bg-orange-500 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-orange-600 hover:shadow-md transition-all duration-300 border border-orange-500">
-                            Sign Up
-                        </Link>
-                        <Link to="/profile" className="flex items-center text-gray-700 hover:text-orange-500 transition-colors duration-300">
-                            <CgProfile className="w-6 h-6" />
-                        </Link>
+                        {!isLoggedIn && (
+                            <>
+                                <Link 
+                                    to="/login" 
+                                    className="relative overflow-hidden text-gray-700 px-4 py-2 text-sm font-medium
+                                    transition-all duration-300 hover:bg-orange-50 hover:scale-[1.02] rounded-md
+                                    border border-transparent hover:border-orange-200"
+                                >
+                                    Login
+                                </Link>
+                                <Link 
+                                    to="/signup" 
+                                    className="bg-orange-500 text-white px-4 py-2 rounded-md text-sm font-medium
+                                    transition-all duration-300 hover:bg-orange-600 hover:scale-[1.02]
+                                    shadow-md hover:shadow-orange-200"
+                                >
+                                    Sign Up
+                                </Link>
+                            </>
+                        )}
+                        {isLoggedIn && (
+                            <div className="flex items-center space-x-2">
+                                <span className="text-sm font-medium text-gray-600">
+                                    {localStorage.getItem('username')}
+                                </span>
+                                <Link 
+                                    to="/profile" 
+                                    className="flex items-center text-gray-700 transition-all duration-300
+                                    hover:text-orange-500 hover:rotate-[15deg]"
+                                >
+                                    <CgProfile className="w-6 h-6" />
+                                </Link>
+                            </div>
+                        )}
                     </div>
                 </div>
 
-                {/* Mobile Menu */}
+                {/* Mobile Menu - Subtle Background Transition */}
                 <div className={`md:hidden ${isOpen ? 'block' : 'hidden'}`}>
                     <div className="px-2 pt-2 pb-3 space-y-1 bg-white border-t">
                         <Link 
                             to="/" 
-                            className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-orange-500 hover:bg-gray-50 rounded-md transition-all duration-300"
+                            className="block px-3 py-2 text-base font-medium text-gray-700 
+                            transition-all duration-300 hover:bg-orange-50 hover:translate-x-2 
+                            rounded-md border-l-4 border-transparent hover:border-orange-500"
                             onClick={toggleMenu}
                         >
                             Home
                         </Link>
                         <Link 
                             to="/about" 
-                            className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-orange-500 hover:bg-gray-50 rounded-md transition-all duration-300"
+                            className="block px-3 py-2 text-base font-medium text-gray-700 
+                            transition-all duration-300 hover:bg-orange-50 hover:translate-x-2 
+                            rounded-md border-l-4 border-transparent hover:border-orange-500"
                             onClick={toggleMenu}
                         >
                             About Us
                         </Link>
                         <Link 
                             to="/events" 
-                            className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-orange-500 hover:bg-gray-50 rounded-md transition-all duration-300"
+                            className="block px-3 py-2 text-base font-medium text-gray-700 
+                            transition-all duration-300 hover:bg-orange-50 hover:translate-x-2 
+                            rounded-md border-l-4 border-transparent hover:border-orange-500"
                             onClick={toggleMenu}
                         >
                             Latest Events
                         </Link>
                         <Link 
                             to="/services" 
-                            className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-orange-500 hover:bg-gray-50 rounded-md transition-all duration-300"
+                            className="block px-3 py-2 text-base font-medium text-gray-700 
+                            transition-all duration-300 hover:bg-orange-50 hover:translate-x-2 
+                            rounded-md border-l-4 border-transparent hover:border-orange-500"
                             onClick={toggleMenu}
                         >
                             Services
                         </Link>
                         <Link 
                             to="/contact" 
-                            className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-orange-500 hover:bg-gray-50 rounded-md transition-all duration-300"
+                            className="block px-3 py-2 text-base font-medium text-gray-700 
+                            transition-all duration-300 hover:bg-orange-50 hover:translate-x-2 
+                            rounded-md border-l-4 border-transparent hover:border-orange-500"
                             onClick={toggleMenu}
                         >
                             Contact
                         </Link>
-                        <Link 
-                            to="/login" 
-                            className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-orange-500 hover:bg-gray-50 rounded-md transition-all duration-300"
-                            onClick={toggleMenu}
-                        >
-                            Login
-                        </Link>
-                        <Link 
-                            to="/signup" 
-                            className="block px-3 py-2 text-base font-medium text-orange-500 hover:text-orange-600 hover:bg-gray-50 rounded-md transition-all duration-300"
-                            onClick={toggleMenu}
-                        >
-                            Sign Up
-                        </Link>
-                        <Link 
-                            to="/profile" 
-                            className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-orange-500 hover:bg-gray-50 rounded-md transition-all duration-300"
-                            onClick={toggleMenu}
-                        >
-                            Profile
-                        </Link>
+                        {!isLoggedIn && (
+                            <>
+                                <Link 
+                                    to="/login" 
+                                    className="block px-3 py-2 text-base font-medium text-gray-700 
+                                    transition-all duration-300 hover:bg-orange-50 hover:translate-x-2 
+                                    rounded-md border-l-4 border-transparent hover:border-orange-500"
+                                    onClick={toggleMenu}
+                                >
+                                    Login
+                                </Link>
+                                <Link 
+                                    to="/signup" 
+                                    className="block px-3 py-2 text-base font-medium text-orange-500 
+                                    transition-all duration-300 hover:bg-orange-50 hover:translate-x-2 
+                                    rounded-md border-l-4 border-transparent hover:border-orange-500"
+                                    onClick={toggleMenu}
+                                >
+                                    Sign Up
+                                </Link>
+                            </>
+                        )}
+                        {isLoggedIn && (
+                            <Link 
+                                to="/profile" 
+                                className="block px-3 py-2 text-base font-medium text-gray-700 
+                                transition-all duration-300 hover:bg-orange-50 hover:translate-x-2 
+                                rounded-md border-l-4 border-transparent hover:border-orange-500"
+                                onClick={toggleMenu}
+                            >
+                                {localStorage.getItem('username')}
+                            </Link>
+                        )}
                     </div>
                 </div>
             </div>
