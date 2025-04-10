@@ -35,5 +35,11 @@ module.exports=(sequelize,DataTypes)=>{
             allowNull: true
         }
     })
+    Posts.associate = (models) => {
+        // Each post can have many bookings
+        Posts.hasMany(models.Booking, {
+            onDelete: "cascade"
+        });
+    };
     return Posts;
 }

@@ -10,6 +10,7 @@ const OrderForm = () => {
     const [itemDetails, setItemDetails] = useState(null);
     const [selectedAddons, setSelectedAddons] = useState(location.state?.selectedAddons || []);
     const [totalPrice, setTotalPrice] = useState(location.state?.totalPrice || 0);
+    const [userData, setUserData] = useState(null);
 
     const availableAddons = [
         { id: 1, name: 'Candle Package', priceAdjustment: 15, description: 'Set of 24 elegant decorative candles' },
@@ -20,7 +21,8 @@ const OrderForm = () => {
     const [formData, setFormData] = useState({
         fullName: '',
         email: '',
-        phoneNumber: '',
+        phoneNumber: '+964',
+        address: '',
         eventDate: '',
         additionalRequests: '',
         paymentMethod: '',
@@ -84,9 +86,39 @@ const OrderForm = () => {
         fetchItemDetails();
     }, [id, location.state]);
 
+    useEffect(() => {
+        const fetchUserData = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const response = await axios.get('http://localhost:3001/auth/user', {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                setUserData(response.data);
+                setFormData(prev => ({
+                    ...prev,
+                    fullName: response.data.username,
+                    email: response.data.email
+                }));
+            } catch (error) {
+                console.error("Error fetching user data:", error);
+                navigate('/login');
+            }
+        };
+        fetchUserData();
+    }, []);
+
     const handleChange = (e) => {
         const { name, value, files } = e.target;
-        if (name === 'paymentProof') {
+        
+        if (name === 'phoneNumber') {
+            // Allow 10 digits after country code
+            const cleanedValue = '+964' + value.replace(/\D/g, '').slice(0, 10);
+            
+            setFormData(prevState => ({
+                ...prevState,
+                [name]: cleanedValue
+            }));
+        } else if (name === 'paymentProof') {
             setFormData(prevState => ({
                 ...prevState,
                 [name]: files[0]
@@ -119,14 +151,41 @@ const OrderForm = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            await axios.post('http://localhost:3001/orders', {
+            const token = localStorage.getItem('token');
+            
+            // Verify token exists
+            if (!token) {
+                alert('You need to be logged in to create a booking');
+                navigate('/login');
+                return;
+            }
+            
+            // Log what's being sent
+            console.log("Sending booking data:", {
                 ...formData,
                 serviceId: id
             });
-            // Redirect to success page or show success message
-            navigate('/success');
+            
+            const response = await axios.post('http://localhost:3001/booking', {
+                ...formData,
+                serviceId: id
+            }, {
+                headers: { 
+                    accessToken: token  // Changed from Authorization to accessToken
+                }
+            });
+            
+            console.log("Booking response:", response.data);
+            
+            // Only navigate if successful
+            if (response.data.success) {
+                navigate('/success');
+            } else {
+                alert('Error: ' + (response.data.message || 'Failed to create booking'));
+            }
         } catch (error) {
             console.error('Error submitting order:', error);
+            alert('Failed to create booking: ' + (error.response?.data?.error || error.message));
         }
     };
 
@@ -165,15 +224,14 @@ const OrderForm = () => {
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Full Name
+                                 Name
                             </label>
                             <input
                                 type="text"
                                 name="fullName"
                                 value={formData.fullName}
-                                onChange={handleChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                                required
+                                readOnly
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100"
                             />
                         </div>
 
@@ -185,9 +243,8 @@ const OrderForm = () => {
                                 type="email"
                                 name="email"
                                 value={formData.email}
-                                onChange={handleChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                                required
+                                readOnly
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100"
                             />
                         </div>
 
@@ -195,12 +252,42 @@ const OrderForm = () => {
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                                 Phone Number
                             </label>
-                            <input
-                                type="tel"
-                                name="phoneNumber"
-                                value={formData.phoneNumber}
+                            <div className="flex gap-2">
+                                {/* Country Code */}
+                                <div className="flex items-center px-3 py-2 border border-r-0 border-gray-300 rounded-l-md bg-gray-50">
+                                    <span className="text-gray-600">+964</span>
+                                </div>
+                                {/* Phone Number Input */}
+                                <input
+                                    type="tel"
+                                    name="phoneNumber"
+                                    value={formData.phoneNumber.replace('+964', '')}
+                                    onChange={handleChange}
+                                    pattern="\d{10}"
+                                    title="Enter 10-digit phone number (excluding country code)"
+                                    maxLength={10}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-r-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                    placeholder="7701234567"
+                                    required
+                                />
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">
+                                Enter your 10-digit phone number
+                            </p>
+                        </div>
+
+                        {/* New Address Field */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                 Address
+                            </label>
+                            <textarea
+                                name="address"
+                                value={formData.address}
                                 onChange={handleChange}
+                                rows="3"
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                placeholder="Street name, Building number, District"
                                 required
                             />
                         </div>

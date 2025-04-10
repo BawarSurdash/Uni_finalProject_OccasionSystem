@@ -53,7 +53,7 @@ const Profile = () => {
             <h2 className="text-2xl font-semibold">
               Welcome back, {userData?.username || 'User'}!
             </h2>
-            <p className="text-gray-600">Edit and manage your personal and account information here</p>
+            <p className="text-gray-600"> your personal account information here</p>
           </div>
           {/* Logout Button */}
           <button
@@ -115,21 +115,22 @@ const Profile = () => {
           {activeTab === "personal" && (
             <div className="space-y-4">
               <div>
-                <label className="block text-gray-700 mb-2">First Name</label>
-                <input type="text" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500" placeholder="John" />
-              </div>
-              <div>
-                <label className="block text-gray-700 mb-2">Last Name</label>
-                <input type="text" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500" placeholder="Doe" />
+                <label className="block text-gray-700 mb-2">Username</label>
+                <input 
+                  type="text" 
+                  value={userData?.username || ''}
+                  className="w-full p-2 border rounded-lg bg-gray-100"
+                  readOnly
+                />
               </div>
               <div>
                 <label className="block text-gray-700 mb-2">Email</label>
-                <input type="email" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500" placeholder="john@example.com" />
-              </div>
-              <div className="pt-4">
-                <button className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors duration-300">
-                  Save Changes
-                </button>
+                <input 
+                  type="email" 
+                  value={userData?.email || ''}
+                  className="w-full p-2 border rounded-lg bg-gray-100"
+                  readOnly
+                />
               </div>
             </div>
           )}

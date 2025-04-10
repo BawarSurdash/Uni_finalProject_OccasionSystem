@@ -30,13 +30,22 @@ const Dashboard = () => {
     const [activeTab, setActiveTab] = useState('createPost');
     const [orderHistory, setOrderHistory] = useState([]);
     const [isLoadingOrders, setIsLoadingOrders] = useState(false);
+    const [bookings, setBookings] = useState([]);
+    const [isLoadingBookings, setIsLoadingBookings] = useState(false);
+    const [selectedBooking, setSelectedBooking] = useState(null);
+    const [isViewingBookingDetails, setIsViewingBookingDetails] = useState(false);
+    const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+    const [newStatus, setNewStatus] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('All');
     const [selectedPostType, setSelectedPostType] = useState('All'); // 'All', 'Regular', 'Special'
+    const [selectedBookingStatus, setSelectedBookingStatus] = useState('All'); // For filtering bookings by status
     const [stats, setStats] = useState({
         totalPosts: 0,
         specialPosts: 0,
         totalOrders: 0,
-        completedOrders: 0
+        completedOrders: 0,
+        pendingOrders: 0,
+        cancelledOrders: 0
     });
 
     const {
@@ -144,33 +153,42 @@ const Dashboard = () => {
             console.log('Fetched posts:', posts);
             const specialPosts = posts.filter(post => post.isSpecial).length;
 
-            // Fetch orders statistics
-            const ordersResponse = await axios.get('http://localhost:3001/orders');
-            const orders = ordersResponse.data || [];
-            console.log('Fetched orders:', orders);
-            const completedOrders = orders.filter(order => order.status === 'Completed').length;
+            // Fetch bookings statistics
+            const token = localStorage.getItem('token');
+            const bookingsResponse = await axios.get('http://localhost:3001/booking/stats', {
+                headers: { accessToken: token }
+            });
+            
+            const bookingsStats = bookingsResponse.data;
+            console.log('Fetched booking stats:', bookingsStats);
 
             const newStats = {
                 totalPosts: posts.length,
                 specialPosts,
-                totalOrders: orders.length,
-                completedOrders
+                totalOrders: bookingsStats.totalBookings || 0,
+                completedOrders: bookingsStats.completedBookings || 0,
+                pendingOrders: bookingsStats.pendingBookings || 0,
+                cancelledOrders: bookingsStats.cancelledBookings || 0
             };
+            
             console.log('Updating statistics:', newStats);
             setStats(newStats);
         } catch (error) {
-            if (error.response && error.response.status === 404) {
-                // If orders endpoint doesn't exist yet, just update posts stats
+            console.error('Error fetching statistics:', error);
+            
+            // If booking stats fails, still update posts stats
+            try {
                 const postsResponse = await axios.get('http://localhost:3001/posts');
                 const posts = postsResponse.data;
                 const specialPosts = posts.filter(post => post.isSpecial).length;
+                
                 setStats(prevStats => ({
                     ...prevStats,
                     totalPosts: posts.length,
                     specialPosts
                 }));
-            } else {
-                console.error('Error fetching statistics:', error);
+            } catch (postsError) {
+                console.error('Error fetching posts statistics:', postsError);
             }
         }
     };
@@ -178,6 +196,10 @@ const Dashboard = () => {
     useEffect(() => {
         if (activeTab === 'orderHistory') {
             fetchOrderHistory();
+        }
+        
+        if (activeTab === 'userOrders') {
+            fetchBookings();
         }
     }, [activeTab]);
 
@@ -339,6 +361,101 @@ const Dashboard = () => {
         return categoryMatch && typeMatch;
     });
 
+    const fetchBookings = async () => {
+        setIsLoadingBookings(true);
+        try {
+            const token = localStorage.getItem('token');
+            const response = await axios.get('http://localhost:3001/booking', {
+                headers: { accessToken: token }
+            });
+            console.log('Bookings data:', response.data);
+            setBookings(response.data);
+        } catch (error) {
+            console.error('Error fetching bookings:', error);
+            setBookings([]);
+        } finally {
+            setIsLoadingBookings(false);
+        }
+    };
+
+    const viewBookingDetails = async (bookingId) => {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await axios.get(`http://localhost:3001/booking/${bookingId}`, {
+                headers: { accessToken: token }
+            });
+            setSelectedBooking(response.data);
+            setIsViewingBookingDetails(true);
+        } catch (error) {
+            console.error('Error fetching booking details:', error);
+            alert('Failed to fetch booking details');
+        }
+    };
+    
+    const cancelBooking = async (bookingId) => {
+        if (!window.confirm('Are you sure you want to cancel this booking?')) {
+            return;
+        }
+        
+        try {
+            const token = localStorage.getItem('token');
+            const response = await axios.put(`http://localhost:3001/booking/cancel/${bookingId}`, {}, {
+                headers: { accessToken: token }
+            });
+            
+            if (response.data.success) {
+                // Update the booking status in the list
+                setBookings(bookings.map(booking => 
+                    booking.id === bookingId ? { ...booking, status: 'cancelled' } : booking
+                ));
+                
+                // If we're viewing the details of the cancelled booking, update it
+                if (selectedBooking && selectedBooking.id === bookingId) {
+                    setSelectedBooking({ ...selectedBooking, status: 'cancelled' });
+                }
+                
+                alert('Booking cancelled successfully');
+            }
+        } catch (error) {
+            console.error('Error cancelling booking:', error);
+            alert('Failed to cancel booking: ' + (error.response?.data?.error || error.message));
+        }
+    };
+
+    const updateBookingStatus = async (bookingId, status) => {
+        try {
+            setIsUpdatingStatus(true);
+            const token = localStorage.getItem('token');
+            const response = await axios.put(`http://localhost:3001/booking/status/${bookingId}`, 
+                { status },
+                { headers: { accessToken: token } }
+            );
+            
+            if (response.data) {
+                // Update the booking status in the list
+                setBookings(bookings.map(booking => 
+                    booking.id === bookingId ? { ...booking, status } : booking
+                ));
+                
+                // If we're viewing the details of the updated booking, update it
+                if (selectedBooking && selectedBooking.id === bookingId) {
+                    setSelectedBooking({ ...selectedBooking, status });
+                }
+                
+                // Update statistics after status change
+                fetchStatistics();
+                
+                alert(`Booking status updated to "${status}"`);
+            }
+        } catch (error) {
+            console.error('Error updating booking status:', error);
+            alert('Failed to update status: ' + (error.response?.data?.error || error.message));
+        } finally {
+            setIsUpdatingStatus(false);
+            setNewStatus('');
+        }
+    };
+
     return (
         <Layout hasSider>
             <Sider style={siderStyle} width={200}>
@@ -373,7 +490,7 @@ const Dashboard = () => {
                         {activeTab === 'createPost' && (
                             <>
                                 {/* Statistics Cards */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
                                     {/* Total Posts */}
                                     <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
                                         <div className="flex flex-col">
@@ -392,8 +509,8 @@ const Dashboard = () => {
                                         <div className="flex flex-col">
                                             <span className="text-gray-500 text-sm">Special Posts</span>
                                             <div className="flex items-center mt-2">
-                                                <span className="text-3xl font-semibold text-red-500">{stats.specialPosts}</span>
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 ml-2 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <span className="text-3xl font-semibold text-purple-500">{stats.specialPosts}</span>
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 ml-2 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                                                 </svg>
                                             </div>
@@ -403,11 +520,24 @@ const Dashboard = () => {
                                     {/* Total Orders */}
                                     <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
                                         <div className="flex flex-col">
-                                            <span className="text-gray-500 text-sm">Total Orders</span>
+                                            <span className="text-gray-500 text-sm">Total Bookings</span>
                                             <div className="flex items-center mt-2">
-                                                <span className="text-3xl font-semibold">{stats.totalOrders}</span>
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 ml-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <span className="text-3xl font-semibold text-blue-500">{stats.totalOrders}</span>
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 ml-2 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                                                </svg>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Pending Orders */}
+                                    <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+                                        <div className="flex flex-col">
+                                            <span className="text-gray-500 text-sm">Pending Bookings</span>
+                                            <div className="flex items-center mt-2">
+                                                <span className="text-3xl font-semibold text-yellow-500">{stats.pendingOrders}</span>
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 ml-2 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                 </svg>
                                             </div>
                                         </div>
@@ -416,11 +546,24 @@ const Dashboard = () => {
                                     {/* Completed Orders */}
                                     <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
                                         <div className="flex flex-col">
-                                            <span className="text-gray-500 text-sm">Completed Orders</span>
+                                            <span className="text-gray-500 text-sm">Completed Bookings</span>
                                             <div className="flex items-center mt-2">
                                                 <span className="text-3xl font-semibold text-green-500">{stats.completedOrders}</span>
                                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 ml-2 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Optional: Hide on smaller screens for better mobile experience */}
+                                    <div className="hidden xl:block bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+                                        <div className="flex flex-col">
+                                            <span className="text-gray-500 text-sm">Cancelled Bookings</span>
+                                            <div className="flex items-center mt-2">
+                                                <span className="text-3xl font-semibold text-red-500">{stats.cancelledOrders}</span>
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 ml-2 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                 </svg>
                                             </div>
                                         </div>
@@ -740,17 +883,18 @@ const Dashboard = () => {
                                                         </div>
 
                                                         {formData.isSpecial && (
-                                                            <div>
+                                                            <div className="md:col-span-2">
                                                                 <label className="block text-sm font-medium text-gray-700 mb-1">
                                                                     Special Features
                                                                 </label>
                                                                 <input
                                                                     type="text"
+                                                                    name="specialFeatures"
                                                                     value={formData.specialFeatures}
                                                                     onChange={handleChange}
-                                                                    name="specialFeatures"
-                                                                    placeholder="Enter special features (e.g., VIP service, Premium decorations)"
                                                                     className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                                                    placeholder="Enter special features (comma separated)"
+                                                                    required={formData.isSpecial}
                                                                 />
                                                             </div>
                                                         )}
@@ -835,8 +979,151 @@ const Dashboard = () => {
 
                         {activeTab === 'userOrders' && (
                             <div className="bg-white rounded-lg shadow p-6">
-                                <h2 className="text-2xl font-semibold mb-4">User Orders</h2>
-                                <p className="text-gray-500">User orders section coming soon.</p>
+                                <div className="flex justify-between items-center mb-6">
+                                    <h2 className="text-2xl font-semibold">User Orders</h2>
+                                    <button 
+                                        onClick={fetchBookings}
+                                        className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition duration-200"
+                                    >
+                                        Refresh
+                                    </button>
+                                </div>
+
+                                {/* Status Filter */}
+                                <div className="mb-6 bg-gray-50 p-4 rounded-lg">
+                                    <label className="block text-sm font-medium text-gray-700 mb-3">Filter by Status</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {['All', 'Pending', 'Confirmed', 'Completed', 'Cancelled'].map((status) => (
+                                            <button
+                                                key={status}
+                                                onClick={() => setSelectedBookingStatus(status === 'All' ? 'All' : status.toLowerCase())}
+                                                className={`px-3 py-1.5 text-sm font-medium rounded-full transition-all duration-200 ${
+                                                    selectedBookingStatus === (status === 'All' ? 'All' : status.toLowerCase())
+                                                        ? status === 'Pending' ? 'bg-yellow-500 text-white shadow-md' :
+                                                          status === 'Confirmed' ? 'bg-blue-500 text-white shadow-md' :
+                                                          status === 'Completed' ? 'bg-green-500 text-white shadow-md' :
+                                                          status === 'Cancelled' ? 'bg-red-500 text-white shadow-md' :
+                                                          'bg-blue-500 text-white shadow-md'
+                                                        : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                                                }`}
+                                            >
+                                                {status}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {isLoadingBookings ? (
+                                    <div className="text-center py-8">
+                                        <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
+                                        <p className="mt-2 text-gray-500">Loading bookings...</p>
+                                    </div>
+                                ) : bookings.length > 0 ? (
+                                    <div className="overflow-x-auto">
+                                        <table className="min-w-full bg-white">
+                                            <thead className="bg-gray-100">
+                                                <tr>
+                                                    <th className="py-2 px-4 border-b text-left">Booking ID</th>
+                                                    <th className="py-2 px-4 border-b text-left">Username</th>
+                                                    <th className="py-2 px-4 border-b text-left">Event Date</th>
+                                                    <th className="py-2 px-4 border-b text-left">Total Price</th>
+                                                    <th className="py-2 px-4 border-b text-left">Payment Method</th>
+                                                    <th className="py-2 px-4 border-b text-left">Phone Number</th>
+                                                    <th className="py-2 px-4 border-b text-left">Address</th>
+                                                    <th className="py-2 px-4 border-b text-left">Status</th>
+                                                    <th className="py-2 px-4 border-b text-left">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {bookings.filter(booking => 
+                                                    selectedBookingStatus === 'All' || booking.status === selectedBookingStatus
+                                                ).map((booking) => (
+                                                    <tr key={booking.id} className="hover:bg-gray-50">
+                                                        <td className="py-2 px-4 border-b">#{booking.id}</td>
+                                                        <td className="py-2 px-4 border-b">
+                                                            {booking.User ? (
+                                                                <span className="font-medium text-gray-700">
+                                                                    {booking.User.username}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-gray-400 italic">
+                                                                    Unknown
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                        <td className="py-2 px-4 border-b">{formatDate(booking.eventDate)}</td>
+                                                        <td className="py-2 px-4 border-b">${parseFloat(booking.totalPrice).toFixed(2)}</td>
+                                                        <td className="py-2 px-4 border-b">
+                                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                                                booking.paymentMethod === 'fib' ? 'bg-green-100 text-green-800' :
+                                                                booking.paymentMethod === 'fastpay' ? 'bg-pink-100 text-pink-800' :
+                                                                booking.paymentMethod === 'cash' ? 'bg-yellow-100 text-yellow-800' :
+                                                                'bg-gray-100 text-gray-800'
+                                                            }`}>
+                                                                {booking.paymentMethod === 'fib' ? 'FIB Bank' :
+                                                                 booking.paymentMethod === 'fastpay' ? 'FastPay' :
+                                                                 booking.paymentMethod === 'cash' ? 'Cash' :
+                                                                 booking.paymentMethod}
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-2 px-4 border-b">{booking.phoneNumber}</td>
+                                                        <td className="py-2 px-4 border-b">
+                                                            <div className="max-w-xs truncate" title={booking.address}>
+                                                                {booking.address}
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-2 px-4 border-b">
+                                                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                                                booking.status === 'completed' ? 'bg-green-500 text-white' :
+                                                                booking.status === 'confirmed' ? 'bg-blue-500 text-white' :
+                                                                booking.status === 'pending' ? 'bg-yellow-500 text-white' :
+                                                                booking.status === 'cancelled' ? 'bg-red-500 text-white' :
+                                                                'bg-gray-500 text-white'
+                                                            }`}>
+                                                                {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-2 px-4 border-b">
+                                                            <div className="flex items-center space-x-2">
+                                                                <button 
+                                                                    className="text-blue-500 hover:text-blue-700"
+                                                                    onClick={() => viewBookingDetails(booking.id)}
+                                                                >
+                                                                    View
+                                                                </button>
+                                                                
+                                                                <div className="relative inline-block text-left">
+                                                                    <select
+                                                                        className="text-sm border border-gray-300 rounded-md py-1 px-2 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                                        onChange={(e) => {
+                                                                            if (e.target.value && e.target.value !== booking.status) {
+                                                                                if (window.confirm(`Change status to ${e.target.value}?`)) {
+                                                                                    updateBookingStatus(booking.id, e.target.value);
+                                                                                }
+                                                                                e.target.value = "";  // Reset after action
+                                                                            }
+                                                                        }}
+                                                                        defaultValue=""
+                                                                    >
+                                                                        <option value="" disabled>Change Status</option>
+                                                                        {booking.status !== 'pending' && <option value="pending">Pending</option>}
+                                                                        {booking.status !== 'confirmed' && <option value="confirmed">Confirmed</option>}
+                                                                        {booking.status !== 'completed' && <option value="completed">Complete</option>}
+                                                                        {booking.status !== 'cancelled' && <option value="cancelled">Cancelled</option>}
+                                                                    </select>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-8">
+                                        <p className="text-gray-500">No bookings available.</p>
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -924,6 +1211,179 @@ const Dashboard = () => {
                             <div className="bg-white rounded-lg shadow p-6">
                                 <h2 className="text-2xl font-semibold mb-4">Settings</h2>
                                 <p className="text-gray-500">Settings section coming soon.</p>
+                            </div>
+                        )}
+
+                        {/* Booking Details Modal */}
+                        {isViewingBookingDetails && selectedBooking && (
+                            <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                                <div className="relative mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
+                                    <div className="flex justify-between items-center border-b pb-3 mb-4">
+                                        <h3 className="text-xl font-semibold text-gray-900">
+                                            Booking Details #{selectedBooking.id}
+                                        </h3>
+                                        <button 
+                                            onClick={() => setIsViewingBookingDetails(false)}
+                                            className="text-gray-400 hover:text-gray-500"
+                                        >
+                                            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <h4 className="font-medium text-gray-800 mb-3">Booking Information</h4>
+                                            <div className="space-y-3 text-sm">
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-500">Booking Date:</span>
+                                                    <span>{formatDate(selectedBooking.createdAt)}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-500">Event Date:</span>
+                                                    <span>{formatDate(selectedBooking.eventDate)}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-500">Status:</span>
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                                        selectedBooking.status === 'completed' ? 'bg-green-500 text-white' :
+                                                        selectedBooking.status === 'confirmed' ? 'bg-blue-500 text-white' :
+                                                        selectedBooking.status === 'pending' ? 'bg-yellow-500 text-white' :
+                                                        selectedBooking.status === 'cancelled' ? 'bg-red-500 text-white' :
+                                                        'bg-gray-500 text-white'
+                                                    }`}>
+                                                        {selectedBooking.status.charAt(0).toUpperCase() + selectedBooking.status.slice(1)}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-500">Total Price:</span>
+                                                    <span className="font-medium">${parseFloat(selectedBooking.totalPrice).toFixed(2)}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-500">Payment Method:</span>
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                                        selectedBooking.paymentMethod === 'fib' ? 'bg-green-100 text-green-800' :
+                                                        selectedBooking.paymentMethod === 'fastpay' ? 'bg-pink-100 text-pink-800' :
+                                                        selectedBooking.paymentMethod === 'cash' ? 'bg-yellow-100 text-yellow-800' :
+                                                        'bg-gray-100 text-gray-800'
+                                                    }`}>
+                                                        {selectedBooking.paymentMethod === 'fib' ? 'FIB Bank' :
+                                                         selectedBooking.paymentMethod === 'fastpay' ? 'FastPay' :
+                                                         selectedBooking.paymentMethod === 'cash' ? 'Cash' :
+                                                         selectedBooking.paymentMethod}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div>
+                                            <h4 className="font-medium text-gray-800 mb-3">Contact Information</h4>
+                                            <div className="space-y-3 text-sm">
+                                                {selectedBooking.User && (
+                                                <div>
+                                                    <div className="flex justify-between">
+                                                        <span className="text-gray-500">Username:</span>
+                                                        <span>{selectedBooking.User.username}</span>
+                                                    </div>
+                                                    <div className="flex justify-between">
+                                                        <span className="text-gray-500">Email:</span>
+                                                        <span>{selectedBooking.User.email}</span>
+                                                    </div>
+                                                </div>
+                                                )}
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-500">Phone:</span>
+                                                    <span>{selectedBooking.phoneNumber}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="text-gray-500 block mb-1">Address:</span>
+                                                    <span className="block text-right">{selectedBooking.address}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    {selectedBooking.Post && (
+                                        <div className="mt-6 border-t pt-4">
+                                            <h4 className="font-medium text-gray-800 mb-3">Service Details</h4>
+                                            <div className="flex flex-col md:flex-row">
+                                                {selectedBooking.Post.image && (
+                                                    <div className="md:w-1/3 mb-4 md:mb-0 md:mr-4">
+                                                        <img 
+                                                            src={selectedBooking.Post.image} 
+                                                            alt={selectedBooking.Post.title} 
+                                                            className="w-full h-32 object-cover rounded-lg"
+                                                        />
+                                                    </div>
+                                                )}
+                                                <div className="md:w-2/3">
+                                                    <h5 className="text-lg font-medium">{selectedBooking.Post.title}</h5>
+                                                    <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full mb-2">
+                                                        {selectedBooking.Post.category}
+                                                    </span>
+                                                    <p className="text-sm text-gray-600">{selectedBooking.Post.description}</p>
+                                                    <p className="text-sm font-medium text-gray-700 mt-2">
+                                                        Base Price: ${parseFloat(selectedBooking.Post.basePrice).toFixed(2)}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    
+                                    <div className="mt-6 flex justify-end space-x-4">
+                                        <button
+                                            onClick={() => setIsViewingBookingDetails(false)}
+                                            className="px-4 py-2 bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200"
+                                        >
+                                            Close
+                                        </button>
+                                        
+                                        {/* Status Change Dropdown */}
+                                        <div className="flex items-center">
+                                            <select
+                                                value={newStatus}
+                                                onChange={(e) => setNewStatus(e.target.value)}
+                                                className="mr-2 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                disabled={isUpdatingStatus}
+                                            >
+                                                <option value="">Change Status</option>
+                                                <option value="pending">Pending</option>
+                                                <option value="confirmed">Confirmed</option>
+                                                <option value="completed">Complete</option>
+                                                <option value="cancelled">Cancelled</option>
+                                            </select>
+                                            
+                                            <button
+                                                onClick={() => {
+                                                    if (newStatus && newStatus !== selectedBooking.status) {
+                                                        updateBookingStatus(selectedBooking.id, newStatus);
+                                                    }
+                                                }}
+                                                disabled={!newStatus || newStatus === selectedBooking.status || isUpdatingStatus}
+                                                className={`px-4 py-2 rounded-lg text-white ${
+                                                    !newStatus || newStatus === selectedBooking.status || isUpdatingStatus
+                                                    ? 'bg-gray-400 cursor-not-allowed'
+                                                    : 'bg-blue-500 hover:bg-blue-600'
+                                                }`}
+                                            >
+                                                {isUpdatingStatus ? 'Updating...' : 'Update'}
+                                            </button>
+                                        </div>
+                                        
+                                        {selectedBooking.status === 'pending' && (
+                                            <button
+                                                onClick={() => {
+                                                    cancelBooking(selectedBooking.id);
+                                                    setIsViewingBookingDetails(false);
+                                                }}
+                                                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                                            >
+                                                Cancel Booking
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         )}
                     </div>

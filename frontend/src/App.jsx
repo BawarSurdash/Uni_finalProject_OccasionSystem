@@ -13,6 +13,7 @@ import Profile from './Components/profile'
 import EventDetail from './Components/eventDetail'
 import ServicesDetail from './Components/servicesDetail'
 import OrderForm from './Components/orderform'
+import BookingSuccess from './Components/BookingSuccess'
 
 function App() {
   return (
@@ -32,6 +33,7 @@ function App() {
             <Route path="/profile" element={<Profile />} />
             <Route path="/servicesdetail/:id" element={<ServicesDetail />} />
             <Route path="/book/:id" element={<OrderForm />} />
+            <Route path="/success" element={<BookingSuccess />} />
         </Routes>
       </BrowserRouter>
     </>
