@@ -14,6 +14,7 @@ import EventDetail from './Components/eventDetail'
 import ServicesDetail from './Components/servicesDetail'
 import OrderForm from './Components/orderform'
 import BookingSuccess from './Components/BookingSuccess'
+import BookingDetail from './Components/BookingDetail'
 
 function App() {
   return (
@@ -34,6 +35,7 @@ function App() {
             <Route path="/servicesdetail/:id" element={<ServicesDetail />} />
             <Route path="/book/:id" element={<OrderForm />} />
             <Route path="/success" element={<BookingSuccess />} />
+            <Route path="/booking/:id" element={<BookingDetail />} />
         </Routes>
       </BrowserRouter>
     </>

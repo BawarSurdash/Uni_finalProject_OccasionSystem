@@ -182,6 +182,100 @@ router.put('/cancel/:id', validateToken, async(req, res) => {
     }
 });
 
+// Get all bookings (admin route)
+router.get('/admin/all', validateToken, async(req, res) => {
+    try {
+        // Find all bookings with associated post and user details
+        const bookings = await Booking.findAll({
+            include: [
+                { 
+                    model: Posts,
+                    attributes: ['id', 'title', 'category', 'image', 'basePrice'] 
+                },
+                {
+                    model: Users,
+                    attributes: ['id', 'username', 'email']
+                }
+            ],
+            order: [['createdAt', 'DESC']]
+        });
+        
+        res.json(bookings);
+    } catch (error) {
+        console.error("Error fetching all bookings:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get a specific booking by ID for admin (without user restriction)
+router.get('/admin/:id', validateToken, async(req, res) => {
+    try {
+        const bookingId = req.params.id;
+        
+        // Find the booking with associated post and user details
+        const booking = await Booking.findOne({
+            where: { id: bookingId },
+            include: [
+                { 
+                    model: Posts,
+                    attributes: ['id', 'title', 'category', 'image', 'basePrice', 'description'] 
+                },
+                {
+                    model: Users,
+                    attributes: ['id', 'username', 'email'] 
+                }
+            ]
+        });
+        
+        if (!booking) {
+            return res.status(404).json({ error: "Booking not found" });
+        }
+        
+        res.json(booking);
+    } catch (error) {
+        console.error("Error fetching booking:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Cancel a booking (admin route, no user restriction)
+router.put('/admin/cancel/:id', validateToken, async(req, res) => {
+    try {
+        const bookingId = req.params.id;
+        
+        // Find the booking
+        const booking = await Booking.findOne({
+            where: { id: bookingId }
+        });
+        
+        if (!booking) {
+            return res.status(404).json({ error: "Booking not found" });
+        }
+        
+        // Check if booking is already cancelled or completed
+        if (booking.status === 'cancelled') {
+            return res.status(400).json({ error: "Booking is already cancelled" });
+        }
+        
+        if (booking.status === 'completed') {
+            return res.status(400).json({ error: "Cannot cancel a completed booking" });
+        }
+        
+        // Update the booking status to cancelled
+        booking.status = 'cancelled';
+        await booking.save();
+        
+        res.json({ 
+            success: true, 
+            message: "Booking cancelled successfully", 
+            booking 
+        });
+    } catch (error) {
+        console.error("Error cancelling booking:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Get booking statistics
 router.get('/stats', validateToken, async(req, res) => {
     try {

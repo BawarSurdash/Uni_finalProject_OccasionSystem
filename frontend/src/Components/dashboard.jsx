@@ -39,14 +39,31 @@ const Dashboard = () => {
     const [selectedCategory, setSelectedCategory] = useState('All');
     const [selectedPostType, setSelectedPostType] = useState('All'); // 'All', 'Regular', 'Special'
     const [selectedBookingStatus, setSelectedBookingStatus] = useState('All'); // For filtering bookings by status
+    const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('All'); // For filtering bookings by payment method
+    const [currentPage, setCurrentPage] = useState(1);
+    const [bookingsPerPage] = useState(10);
+    const [darkMode, setDarkMode] = useState(localStorage.getItem('darkMode') === 'true' || false);
     const [stats, setStats] = useState({
         totalPosts: 0,
         specialPosts: 0,
         totalOrders: 0,
         completedOrders: 0,
         pendingOrders: 0,
-        cancelledOrders: 0
+        cancelledOrders: 0,
+        confirmedOrders: 0
     });
+    const [selectedOrderStatus, setSelectedOrderStatus] = useState('All'); // For filtering order history
+    const [selectedOrderPaymentMethod, setSelectedOrderPaymentMethod] = useState('All'); // For filtering order history
+    const [selectedOrderTimeframe, setSelectedOrderTimeframe] = useState('All'); // For filtering order history by time
+    const [startDate, setStartDate] = useState(''); // For date range filtering
+    const [endDate, setEndDate] = useState(''); // For date range filtering
+    const [currentOrderPage, setCurrentOrderPage] = useState(1);
+    const [ordersPerPage] = useState(10);
+    const [postsPerPage] = useState(9); // Add this new state for posts pagination
+    const [bookingStartDate, setBookingStartDate] = useState(''); // For All Bookings section
+    const [bookingEndDate, setBookingEndDate] = useState(''); // For All Bookings section
+    const [postStartDate, setPostStartDate] = useState('');
+    const [postEndDate, setPostEndDate] = useState('');
 
     const {
         token: { colorBgContainer, borderRadiusLG },
@@ -62,7 +79,7 @@ const Dashboard = () => {
         {
             key: 'userOrders',
             icon: <ShoppingCartOutlined />,
-            label: 'User Orders',
+            label: 'All Bookings',
             className: 'text-white'
         },
         {
@@ -168,7 +185,8 @@ const Dashboard = () => {
                 totalOrders: bookingsStats.totalBookings || 0,
                 completedOrders: bookingsStats.completedBookings || 0,
                 pendingOrders: bookingsStats.pendingBookings || 0,
-                cancelledOrders: bookingsStats.cancelledBookings || 0
+                cancelledOrders: bookingsStats.cancelledBookings || 0,
+                confirmedOrders: bookingsStats.confirmedBookings || 0
             };
             
             console.log('Updating statistics:', newStats);
@@ -200,6 +218,7 @@ const Dashboard = () => {
         
         if (activeTab === 'userOrders') {
             fetchBookings();
+            fetchStatistics();
         }
     }, [activeTab]);
 
@@ -328,9 +347,19 @@ const Dashboard = () => {
     const fetchOrderHistory = async () => {
         setIsLoadingOrders(true);
         try {
-            const response = await axios.get('http://localhost:3001/orders/history');
-            console.log('Order history:', response.data);
-            setOrderHistory(response.data);
+            // Use the booking endpoint to get completed and cancelled bookings
+            const token = localStorage.getItem('token');
+            const response = await axios.get('http://localhost:3001/booking/admin/all', {
+                headers: { accessToken: token }
+            });
+            
+            // Filter to only include completed and cancelled bookings
+            const completedAndCancelledBookings = response.data.filter(
+                booking => booking.status === 'completed' || booking.status === 'cancelled'
+            );
+            
+            console.log('Order history data:', completedAndCancelledBookings);
+            setOrderHistory(completedAndCancelledBookings);
         } catch (error) {
             console.error('Error fetching order history:', error);
             // Initialize with empty array if endpoint doesn't exist yet
@@ -358,18 +387,64 @@ const Dashboard = () => {
             typeMatch = post.isSpecial;
         }
         
-        return categoryMatch && typeMatch;
+        // Filter by date range
+        let dateMatch = true;
+        if (postStartDate || postEndDate) {
+            const postDate = new Date(post.createdAt);
+            
+            if (postStartDate && postEndDate) {
+                const start = new Date(postStartDate);
+                const end = new Date(postEndDate);
+                // Set end date to end of day for inclusive comparison
+                end.setHours(23, 59, 59, 999);
+                dateMatch = postDate >= start && postDate <= end;
+            } else if (postStartDate) {
+                const start = new Date(postStartDate);
+                dateMatch = postDate >= start;
+            } else if (postEndDate) {
+                const end = new Date(postEndDate);
+                // Set end date to end of day for inclusive comparison
+                end.setHours(23, 59, 59, 999);
+                dateMatch = postDate <= end;
+            }
+        }
+        
+        return categoryMatch && typeMatch && dateMatch;
     });
+
+    // Calculate pagination for posts section
+    const indexOfLastPost = currentPage * postsPerPage;
+    const indexOfFirstPost = indexOfLastPost - postsPerPage;
+    const currentPosts = filteredPosts.slice(indexOfFirstPost, indexOfLastPost);
+    const totalPostPages = Math.ceil(filteredPosts.length / postsPerPage);
 
     const fetchBookings = async () => {
         setIsLoadingBookings(true);
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.get('http://localhost:3001/booking', {
+            // Use admin endpoint to get all bookings
+            const response = await axios.get('http://localhost:3001/booking/admin/all', {
                 headers: { accessToken: token }
             });
-            console.log('Bookings data:', response.data);
+            console.log('All bookings data:', response.data);
             setBookings(response.data);
+            
+            // Update booking counts in stats based on fetched data
+            if (response.data && response.data.length > 0) {
+                const pendingCount = response.data.filter(booking => booking.status === 'pending').length;
+                const completedCount = response.data.filter(booking => booking.status === 'completed').length;
+                const cancelledCount = response.data.filter(booking => booking.status === 'cancelled').length;
+                const confirmedCount = response.data.filter(booking => booking.status === 'confirmed').length;
+                
+                setStats(prevStats => ({
+                    ...prevStats,
+                    totalOrders: response.data.length,
+                    pendingOrders: pendingCount,
+                    completedOrders: completedCount,
+                    cancelledOrders: cancelledCount,
+                    confirmedOrders: confirmedCount
+                }));
+            }
         } catch (error) {
             console.error('Error fetching bookings:', error);
             setBookings([]);
@@ -381,7 +456,7 @@ const Dashboard = () => {
     const viewBookingDetails = async (bookingId) => {
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.get(`http://localhost:3001/booking/${bookingId}`, {
+            const response = await axios.get(`http://localhost:3001/booking/admin/${bookingId}`, {
                 headers: { accessToken: token }
             });
             setSelectedBooking(response.data);
@@ -399,7 +474,7 @@ const Dashboard = () => {
         
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.put(`http://localhost:3001/booking/cancel/${bookingId}`, {}, {
+            const response = await axios.put(`http://localhost:3001/booking/admin/cancel/${bookingId}`, {}, {
                 headers: { accessToken: token }
             });
             
@@ -456,14 +531,128 @@ const Dashboard = () => {
         }
     };
 
+    // Dark mode toggle handler
+    const toggleDarkMode = () => {
+        const newDarkMode = !darkMode;
+        setDarkMode(newDarkMode);
+        localStorage.setItem('darkMode', newDarkMode);
+        
+        // Apply dark mode class to body
+        if (newDarkMode) {
+            document.body.classList.add('dark-mode');
+        } else {
+            document.body.classList.remove('dark-mode');
+        }
+    };
+
+    // Apply dark mode on component mount
+    useEffect(() => {
+        if (darkMode) {
+            document.body.classList.add('dark-mode');
+        } else {
+            document.body.classList.remove('dark-mode');
+        }
+    }, [darkMode]);
+
+    const filteredOrderHistory = orderHistory.filter(order => {
+        // Filter by status
+        const statusMatch = selectedOrderStatus === 'All' || order.status === selectedOrderStatus;
+        
+        // Filter by payment method
+        const paymentMatch = selectedOrderPaymentMethod === 'All' || order.paymentMethod === selectedOrderPaymentMethod;
+        
+        // Filter by date range
+        let dateMatch = true;
+        const orderDate = new Date(order.createdAt);
+        
+        if (startDate && endDate) {
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            // Set end date to end of day
+            end.setHours(23, 59, 59, 999);
+            dateMatch = orderDate >= start && orderDate <= end;
+        } else if (startDate) {
+            const start = new Date(startDate);
+            dateMatch = orderDate >= start;
+        } else if (endDate) {
+            const end = new Date(endDate);
+            // Set end date to end of day
+            end.setHours(23, 59, 59, 999);
+            dateMatch = orderDate <= end;
+        }
+        
+        // Time frame filter (keep for backward compatibility)
+        let timeMatch = true;
+        const currentDate = new Date();
+        
+        if (selectedOrderTimeframe === '7days') {
+            const sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(currentDate.getDate() - 7);
+            timeMatch = orderDate >= sevenDaysAgo;
+        } else if (selectedOrderTimeframe === '30days') {
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(currentDate.getDate() - 30);
+            timeMatch = orderDate >= thirtyDaysAgo;
+        } else if (selectedOrderTimeframe === '3months') {
+            const threeMonthsAgo = new Date();
+            threeMonthsAgo.setMonth(currentDate.getMonth() - 3);
+            timeMatch = orderDate >= threeMonthsAgo;
+        } else if (selectedOrderTimeframe === '6months') {
+            const sixMonthsAgo = new Date();
+            sixMonthsAgo.setMonth(currentDate.getMonth() - 6);
+            timeMatch = orderDate >= sixMonthsAgo;
+        } else if (selectedOrderTimeframe === 'thisyear') {
+            const firstDayOfYear = new Date(currentDate.getFullYear(), 0, 1);
+            timeMatch = orderDate >= firstDayOfYear;
+        }
+        
+        return statusMatch && paymentMatch && dateMatch && timeMatch;
+    });
+
+    // Calculate pagination for order history
+    const indexOfLastOrder = currentOrderPage * ordersPerPage;
+    const indexOfFirstOrder = indexOfLastOrder - ordersPerPage;
+    const currentOrders = filteredOrderHistory.slice(indexOfFirstOrder, indexOfLastOrder);
+
+    // Modify the filter function for bookings
+    const filteredBookings = bookings.filter(booking => {
+        // Status filter
+        const statusMatch = selectedBookingStatus === 'All' || booking.status === selectedBookingStatus;
+        
+        // Payment method filter
+        const paymentMatch = selectedPaymentMethod === 'All' || booking.paymentMethod === selectedPaymentMethod;
+        
+        // Date range filter
+        let dateMatch = true;
+        const bookingDate = new Date(booking.createdAt);
+        
+        if (bookingStartDate && bookingEndDate) {
+            const start = new Date(bookingStartDate);
+            const end = new Date(bookingEndDate);
+            // Set end date to end of day
+            end.setHours(23, 59, 59, 999);
+            dateMatch = bookingDate >= start && bookingDate <= end;
+        } else if (bookingStartDate) {
+            const start = new Date(bookingStartDate);
+            dateMatch = bookingDate >= start;
+        } else if (bookingEndDate) {
+            const end = new Date(bookingEndDate);
+            // Set end date to end of day
+            end.setHours(23, 59, 59, 999);
+            dateMatch = bookingDate <= end;
+        }
+        
+        return statusMatch && paymentMatch && dateMatch;
+    });
+
     return (
-        <Layout hasSider>
+        <Layout hasSider className={darkMode ? 'dark-theme' : ''}>
             <Sider style={siderStyle} width={200}>
                 <div className="p-4">
                     <h1 className="text-white text-xl font-bold mb-6">Dashboard</h1>
                 </div>
                 <Menu
-                    theme="dark"
+                    theme={darkMode ? "dark" : "dark"} // Always dark for sidebar
                     mode="inline"
                     selectedKeys={[activeTab]}
                     items={menuItems}
@@ -473,16 +662,16 @@ const Dashboard = () => {
                 />
             </Sider>
             <Layout style={{ marginLeft: 200 }}>
-                <Header style={{ padding: 0, background: colorBgContainer }}>
+                <Header style={{ padding: 0, background: darkMode ? '#1f2937' : colorBgContainer }}>
                     <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-                        <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
+                        <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Admin Dashboard</h1>
                     </div>
                 </Header>
                 <Content style={{ margin: '24px 16px 0', overflow: 'initial' }}>
                     <div
                         style={{
                             padding: 24,
-                            background: colorBgContainer,
+                            background: darkMode ? '#1f2937' : colorBgContainer,
                             borderRadius: borderRadiusLG,
                             minHeight: 'calc(100vh - 48px)'
                         }}
@@ -490,14 +679,14 @@ const Dashboard = () => {
                         {activeTab === 'createPost' && (
                             <>
                                 {/* Statistics Cards */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                                     {/* Total Posts */}
-                                    <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+                                    <div className={`${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-100'} p-6 rounded-lg shadow-sm border`}>
                                         <div className="flex flex-col">
-                                            <span className="text-gray-500 text-sm">Total Posts</span>
+                                            <span className={`${darkMode ? 'text-gray-300' : 'text-gray-500'} text-sm`}>Total Posts</span>
                                             <div className="flex items-center mt-2">
-                                                <span className="text-3xl font-semibold">{stats.totalPosts}</span>
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 ml-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <span className={`text-3xl font-semibold ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>{stats.totalPosts}</span>
+                                                <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 ml-2 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
                                                 </svg>
                                             </div>
@@ -505,65 +694,13 @@ const Dashboard = () => {
                                     </div>
 
                                     {/* Special Posts */}
-                                    <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+                                    <div className={`${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-100'} p-6 rounded-lg shadow-sm border`}>
                                         <div className="flex flex-col">
-                                            <span className="text-gray-500 text-sm">Special Posts</span>
+                                            <span className={`${darkMode ? 'text-gray-300' : 'text-gray-500'} text-sm`}>Special Posts</span>
                                             <div className="flex items-center mt-2">
-                                                <span className="text-3xl font-semibold text-purple-500">{stats.specialPosts}</span>
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 ml-2 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <span className={`text-3xl font-semibold ${darkMode ? 'text-purple-300' : 'text-purple-500'}`}>{stats.specialPosts}</span>
+                                                <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 ml-2 ${darkMode ? 'text-purple-400' : 'text-purple-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                                                </svg>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Total Orders */}
-                                    <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-                                        <div className="flex flex-col">
-                                            <span className="text-gray-500 text-sm">Total Bookings</span>
-                                            <div className="flex items-center mt-2">
-                                                <span className="text-3xl font-semibold text-blue-500">{stats.totalOrders}</span>
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 ml-2 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                                                </svg>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Pending Orders */}
-                                    <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-                                        <div className="flex flex-col">
-                                            <span className="text-gray-500 text-sm">Pending Bookings</span>
-                                            <div className="flex items-center mt-2">
-                                                <span className="text-3xl font-semibold text-yellow-500">{stats.pendingOrders}</span>
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 ml-2 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                </svg>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Completed Orders */}
-                                    <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-                                        <div className="flex flex-col">
-                                            <span className="text-gray-500 text-sm">Completed Bookings</span>
-                                            <div className="flex items-center mt-2">
-                                                <span className="text-3xl font-semibold text-green-500">{stats.completedOrders}</span>
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 ml-2 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                </svg>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    {/* Optional: Hide on smaller screens for better mobile experience */}
-                                    <div className="hidden xl:block bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-                                        <div className="flex flex-col">
-                                            <span className="text-gray-500 text-sm">Cancelled Bookings</span>
-                                            <div className="flex items-center mt-2">
-                                                <span className="text-3xl font-semibold text-red-500">{stats.cancelledOrders}</span>
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 ml-2 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                 </svg>
                                             </div>
                                         </div>
@@ -581,29 +718,33 @@ const Dashboard = () => {
 
                                 {/* Post Form */}
                                 {isFormVisible && (
-                                    <div className="mb-8 bg-white rounded-lg shadow p-6">
-                                        <h2 className="text-2xl font-semibold mb-4">Create New Post</h2>
+                                    <div className={`mb-8 ${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow p-6`}>
+                                        <h2 className={`text-2xl font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Create New Post</h2>
                                         <form onSubmit={handleSubmit} className="space-y-4">
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                                                    <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Title</label>
                                                     <input
                                                         type="text"
                                                         name="title"
                                                         value={formData.title}
                                                         onChange={handleChange}
                                                         placeholder="Enter event title"
-                                                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                                        className={`w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ${
+                                                            darkMode ? 'bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400' : 'border-gray-300'
+                                                        }`}
                                                         required
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                                                    <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Category</label>
                                                     <select
                                                         name="category"
                                                         value={formData.category}
                                                         onChange={handleChange}
-                                                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                                        className={`w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ${
+                                                            darkMode ? 'bg-gray-700 border-gray-600 text-gray-200' : 'border-gray-300'
+                                                        }`}
                                                         required
                                                     >
                                                         <option value="">Select event category</option>
@@ -615,38 +756,44 @@ const Dashboard = () => {
                                                     </select>
                                                 </div>
                                                 <div className="md:col-span-2">
-                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                                                    <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Description</label>
                                                     <textarea
                                                         name="description"
                                                         value={formData.description}
                                                         onChange={handleChange}
                                                         rows="3"
                                                         placeholder="Describe your event details..."
-                                                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                                        className={`w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ${
+                                                            darkMode ? 'bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400' : 'border-gray-300'
+                                                        }`}
                                                         required
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Image URL</label>
+                                                    <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Image URL</label>
                                                     <input
                                                         type="text"
                                                         name="image"
                                                         value={formData.image}
                                                         onChange={handleChange}
                                                         placeholder="Enter image URL (https://...)"
-                                                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                                        className={`w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ${
+                                                            darkMode ? 'bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400' : 'border-gray-300'
+                                                        }`}
                                                         required
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Base Price ($)</label>
+                                                    <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Base Price ($)</label>
                                                     <input
                                                         type="text"
                                                         name="basePrice"
                                                         value={formData.basePrice}
                                                         onChange={handleChange}
                                                         placeholder="Enter base price (e.g., 99.99)"
-                                                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                                        className={`w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ${
+                                                            darkMode ? 'bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400' : 'border-gray-300'
+                                                        }`}
                                                         required
                                                     />
                                                 </div>
@@ -657,16 +804,18 @@ const Dashboard = () => {
                                                             name="isSpecial"
                                                             checked={formData.isSpecial}
                                                             onChange={handleChange}
-                                                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                                            className={`h-4 w-4 rounded focus:ring-blue-500 ${
+                                                                darkMode ? 'bg-gray-700 border-gray-600 text-blue-600' : 'text-blue-600 border-gray-300'
+                                                            }`}
                                                         />
-                                                        <label className="ml-2 block text-sm text-gray-900">
+                                                        <label className={`ml-2 block text-sm ${darkMode ? 'text-gray-300' : 'text-gray-900'}`}>
                                                             This is a special post (will appear in Services)
                                                         </label>
                                                     </div>
                                                 </div>
                                                 {formData.isSpecial && (
                                                     <div className="md:col-span-2">
-                                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                        <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                                                             Special Features
                                                         </label>
                                                         <input
@@ -674,7 +823,9 @@ const Dashboard = () => {
                                                             name="specialFeatures"
                                                             value={formData.specialFeatures}
                                                             onChange={handleChange}
-                                                            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                                            className={`w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ${
+                                                                darkMode ? 'bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400' : 'border-gray-300'
+                                                            }`}
                                                             placeholder="Enter special features (comma separated)"
                                                             required={formData.isSpecial}
                                                         />
@@ -694,16 +845,17 @@ const Dashboard = () => {
                                 )}
 
                                 {/* Filters */}
-                                <div className="mb-8 bg-white rounded-lg shadow p-6">
+                                <div className={`mb-8 ${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow p-6`}>
                                     <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
-                                        <h2 className="text-xl font-semibold text-gray-800">Filter Posts</h2>
-                                        <div className="mt-2 md:mt-0">
+                                        <h2 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-800'} mb-2 md:mb-0`}>Filter Posts</h2>
+                                        <div>
                                             <button 
                                                 onClick={() => {
                                                     setSelectedCategory('All');
                                                     setSelectedPostType('All');
+                                                    setCurrentPage(1); // Reset to first page when filters are reset
                                                 }}
-                                                className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+                                                className={`text-sm flex items-center ${darkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800'}`}
                                             >
                                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -715,17 +867,22 @@ const Dashboard = () => {
                                     
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         {/* Category Filter */}
-                                        <div className="bg-gray-50 p-4 rounded-lg">
-                                            <label className="block text-sm font-medium text-gray-700 mb-3">Category</label>
+                                        <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'} p-4 rounded-lg`}>
+                                            <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-3`}>Category</label>
                                             <div className="flex flex-wrap gap-2">
                                                 {categories.map((category) => (
                                                     <button
                                                         key={category}
-                                                        onClick={() => setSelectedCategory(category)}
+                                                        onClick={() => {
+                                                            setSelectedCategory(category);
+                                                            setCurrentPage(1); // Reset to first page when filter changes
+                                                        }}
                                                         className={`px-3 py-1.5 text-sm font-medium rounded-full transition-all duration-200 ${
                                                             selectedCategory === category
                                                                 ? 'bg-blue-500 text-white shadow-md'
-                                                                : 'bg-white text-gray-700 hover:bg-blue-50 border border-gray-200'
+                                                                : darkMode
+                                                                  ? 'bg-gray-600 text-gray-200 hover:bg-gray-500 border border-gray-600'
+                                                                  : 'bg-white text-gray-700 hover:bg-blue-50 border border-gray-200'
                                                         }`}
                                                     >
                                                         {category}
@@ -735,17 +892,22 @@ const Dashboard = () => {
                                         </div>
                                         
                                         {/* Post Type Filter */}
-                                        <div className="bg-gray-50 p-4 rounded-lg">
-                                            <label className="block text-sm font-medium text-gray-700 mb-3">Post Type</label>
+                                        <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'} p-4 rounded-lg`}>
+                                            <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-3`}>Post Type</label>
                                             <div className="flex flex-wrap gap-2">
                                                 {postTypes.map((type) => (
                                                     <button
                                                         key={type}
-                                                        onClick={() => setSelectedPostType(type)}
+                                                        onClick={() => {
+                                                            setSelectedPostType(type);
+                                                            setCurrentPage(1); // Reset to first page when filter changes
+                                                        }}
                                                         className={`px-3 py-1.5 text-sm font-medium rounded-full transition-all duration-200 ${
                                                             selectedPostType === type
                                                                 ? 'bg-blue-500 text-white shadow-md'
-                                                                : 'bg-white text-gray-700 hover:bg-blue-50 border border-gray-200'
+                                                                : darkMode
+                                                                  ? 'bg-gray-600 text-gray-200 hover:bg-gray-500 border border-gray-600'
+                                                                  : 'bg-white text-gray-700 hover:bg-blue-50 border border-gray-200'
                                                         }`}
                                                     >
                                                         {type}
@@ -754,19 +916,76 @@ const Dashboard = () => {
                                             </div>
                                         </div>
                                     </div>
+
+                                    {/* Date Range Filter */}
+                                    <div className={`mt-6 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} p-4 rounded-lg`}>
+                                        <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-3`}>Filter by Creation Date</label>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className={`block text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>Start Date</label>
+                                                <input 
+                                                    type="date" 
+                                                    value={postStartDate}
+                                                    onChange={(e) => {
+                                                        setPostStartDate(e.target.value);
+                                                        setCurrentPage(1); // Reset to first page when filter changes
+                                                    }}
+                                                    className={`w-full p-2 border rounded-md ${
+                                                        darkMode ? 'bg-gray-600 border-gray-500 text-gray-200' : 'border-gray-300 text-gray-800'
+                                                    }`}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className={`block text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>End Date</label>
+                                                <input 
+                                                    type="date" 
+                                                    value={postEndDate}
+                                                    onChange={(e) => {
+                                                        setPostEndDate(e.target.value);
+                                                        setCurrentPage(1); // Reset to first page when filter changes
+                                                    }}
+                                                    className={`w-full p-2 border rounded-md ${
+                                                        darkMode ? 'bg-gray-600 border-gray-500 text-gray-200' : 'border-gray-300 text-gray-800'
+                                                    }`}
+                                                />
+                                            </div>
+                                        </div>
+                                        {(postStartDate || postEndDate) && (
+                                            <div className="mt-2 flex justify-end">
+                                                <button
+                                                    onClick={() => {
+                                                        setPostStartDate('');
+                                                        setPostEndDate('');
+                                                        setCurrentPage(1); // Reset to first page when dates are cleared
+                                                    }}
+                                                    className={`text-sm ${darkMode ? 'text-blue-300 hover:text-blue-200' : 'text-blue-600 hover:text-blue-800'} flex items-center`}
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                    </svg>
+                                                    Clear Dates
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
                                     
                                     {/* Active Filters Summary */}
-                                    {(selectedCategory !== 'All' || selectedPostType !== 'All') && (
-                                        <div className="mt-4 pt-4 border-t border-gray-200">
+                                    {(selectedCategory !== 'All' || selectedPostType !== 'All' || postStartDate || postEndDate) && (
+                                        <div className={`mt-4 pt-4 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
                                             <div className="flex items-center">
-                                                <span className="text-sm text-gray-500 mr-2">Active Filters:</span>
+                                                <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mr-2`}>Active Filters:</span>
                                                 <div className="flex flex-wrap gap-2">
                                                     {selectedCategory !== 'All' && (
-                                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                                            darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'
+                                                        }`}>
                                                             Category: {selectedCategory}
                                                             <button 
-                                                                onClick={() => setSelectedCategory('All')}
-                                                                className="ml-1 text-blue-600 hover:text-blue-800"
+                                                                onClick={() => {
+                                                                    setSelectedCategory('All');
+                                                                    setCurrentPage(1); // Reset to first page when filter changes
+                                                                }}
+                                                                className={`ml-1 ${darkMode ? 'text-blue-300 hover:text-blue-100' : 'text-blue-600 hover:text-blue-800'}`}
                                                             >
                                                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                                                                     <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -775,11 +994,39 @@ const Dashboard = () => {
                                                         </span>
                                                     )}
                                                     {selectedPostType !== 'All' && (
-                                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                                            darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'
+                                                        }`}>
                                                             Type: {selectedPostType}
                                                             <button 
-                                                                onClick={() => setSelectedPostType('All')}
-                                                                className="ml-1 text-blue-600 hover:text-blue-800"
+                                                                onClick={() => {
+                                                                    setSelectedPostType('All');
+                                                                    setCurrentPage(1); // Reset to first page when filter changes
+                                                                }}
+                                                                className={`ml-1 ${darkMode ? 'text-blue-300 hover:text-blue-100' : 'text-blue-600 hover:text-blue-800'}`}
+                                                            >
+                                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                                                                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                                                </svg>
+                                                            </button>
+                                                        </span>
+                                                    )}
+                                                    {(postStartDate || postEndDate) && (
+                                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                                            darkMode ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-800'
+                                                        }`}>
+                                                            Date: {postStartDate && postEndDate ? 
+                                                                `${new Date(postStartDate).toLocaleDateString()} - ${new Date(postEndDate).toLocaleDateString()}` : 
+                                                                postStartDate ? 
+                                                                    `From ${new Date(postStartDate).toLocaleDateString()}` : 
+                                                                    `Until ${new Date(postEndDate).toLocaleDateString()}`}
+                                                            <button 
+                                                                onClick={() => {
+                                                                    setPostStartDate('');
+                                                                    setPostEndDate('');
+                                                                    setCurrentPage(1); // Reset to first page when dates are cleared
+                                                                }}
+                                                                className={`ml-1 ${darkMode ? 'text-green-300 hover:text-green-100' : 'text-green-600 hover:text-green-800'}`}
                                                             >
                                                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                                                                     <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -795,46 +1042,53 @@ const Dashboard = () => {
 
                                 {/* Posts Grid */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    {filteredPosts.map((post) => (
-                                        <div key={post.id} className={`bg-white rounded-lg shadow overflow-hidden ${
-                                            post.isSpecial ? 'border-2 border-purple-200' : ''
-                                        }`}>
+                                    {currentPosts.map((post) => (
+                                        <div key={post.id} className={`${darkMode 
+                                            ? `bg-gray-800 ${post.isSpecial ? 'border-2 border-purple-900' : ''}` 
+                                            : `bg-white ${post.isSpecial ? 'border-2 border-purple-200' : ''}`
+                                        } rounded-lg shadow overflow-hidden`}>
                                             {editing === post.id ? (
                                                 // Edit form
                                                 <div className="p-6">
-                                                    <h3 className="text-xl font-semibold text-gray-900 mb-4">Edit Event</h3>
+                                                    <h3 className={`text-xl font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Edit Event</h3>
                                                     <div className="space-y-4">
                                                         <div>
-                                                            <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                                                            <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Title</label>
                                                             <input
                                                                 type="text"
                                                                 value={formData.title}
                                                                 onChange={handleChange}
                                                                 name="title"
                                                                 placeholder="Enter event title"
-                                                                className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                                                className={`w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ${
+                                                                    darkMode ? 'bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400' : 'border-gray-300'
+                                                                }`}
                                                             />
                                                         </div>
                                                         
                                                         <div>
-                                                            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                                                            <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Description</label>
                                                             <textarea
                                                                 value={formData.description}
                                                                 onChange={handleChange}
                                                                 name="description"
                                                                 rows="3"
                                                                 placeholder="Describe your event details..."
-                                                                className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                                                className={`w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ${
+                                                                    darkMode ? 'bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400' : 'border-gray-300'
+                                                                }`}
                                                             />
                                                         </div>
 
                                                         <div>
-                                                            <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                                                            <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Category</label>
                                                             <select
                                                                 value={formData.category}
                                                                 onChange={handleChange}
                                                                 name="category"
-                                                                className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                                                className={`w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ${
+                                                                    darkMode ? 'bg-gray-700 border-gray-600 text-gray-200' : 'border-gray-300'
+                                                                }`}
                                                             >
                                                                 <option value="">Select event category</option>
                                                                 {categories.filter(cat => cat !== 'All').map((category, index) => (
@@ -846,26 +1100,30 @@ const Dashboard = () => {
                                                         </div>
 
                                                         <div>
-                                                            <label className="block text-sm font-medium text-gray-700 mb-1">Image URL</label>
+                                                            <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Image URL</label>
                                                             <input
                                                                 type="text"
                                                                 value={formData.image}
                                                                 onChange={handleChange}
                                                                 name="image"
                                                                 placeholder="Enter image URL (https://...)"
-                                                                className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                                                className={`w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ${
+                                                                    darkMode ? 'bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400' : 'border-gray-300'
+                                                                }`}
                                                             />
                                                         </div>
 
                                                         <div>
-                                                            <label className="block text-sm font-medium text-gray-700 mb-1">Base Price ($)</label>
+                                                            <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Base Price ($)</label>
                                                             <input
                                                                 type="text"
                                                                 name="basePrice"
                                                                 value={formData.basePrice}
                                                                 onChange={handleChange}
                                                                 placeholder="Enter base price (e.g., 99.99)"
-                                                                className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                                                className={`w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ${
+                                                                    darkMode ? 'bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400' : 'border-gray-300'
+                                                                }`}
                                                             />
                                                         </div>
 
@@ -875,16 +1133,18 @@ const Dashboard = () => {
                                                                 name="isSpecial"
                                                                 checked={formData.isSpecial}
                                                                 onChange={handleChange}
-                                                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                                                className={`h-4 w-4 rounded focus:ring-blue-500 ${
+                                                                    darkMode ? 'bg-gray-700 border-gray-600 text-blue-600' : 'text-blue-600 border-gray-300'
+                                                                }`}
                                                             />
-                                                            <label className="ml-2 block text-sm text-gray-900">
+                                                            <label className={`ml-2 block text-sm ${darkMode ? 'text-gray-300' : 'text-gray-900'}`}>
                                                                 This is a special post (will appear in Services)
                                                             </label>
                                                         </div>
 
                                                         {formData.isSpecial && (
-                                                            <div className="md:col-span-2">
-                                                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                            <div>
+                                                                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                                                                     Special Features
                                                                 </label>
                                                                 <input
@@ -892,7 +1152,9 @@ const Dashboard = () => {
                                                                     name="specialFeatures"
                                                                     value={formData.specialFeatures}
                                                                     onChange={handleChange}
-                                                                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                                                    className={`w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ${
+                                                                        darkMode ? 'bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400' : 'border-gray-300'
+                                                                    }`}
                                                                     placeholder="Enter special features (comma separated)"
                                                                     required={formData.isSpecial}
                                                                 />
@@ -902,7 +1164,11 @@ const Dashboard = () => {
                                                         <div className="flex justify-end space-x-3 mt-6">
                                                             <button
                                                                 onClick={() => setEditing(null)}
-                                                                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                                                className={`px-4 py-2 border rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
+                                                                    darkMode 
+                                                                    ? 'border-gray-600 text-gray-300 hover:bg-gray-700' 
+                                                                    : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                                                                }`}
                                                             >
                                                                 Cancel
                                                             </button>
@@ -929,30 +1195,32 @@ const Dashboard = () => {
                                                     )}
                                                     <div className="p-4">
                                                         <div className="flex justify-between items-start mb-2">
-                                                            <h2 className="text-xl font-bold text-gray-900">{post.title}</h2>
+                                                            <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{post.title}</h2>
                                                             <div className="flex gap-2">
                                                                 <span className={`text-xs font-semibold px-2.5 py-0.5 rounded ${
                                                                     post.isSpecial 
-                                                                    ? 'bg-purple-100 text-purple-800' 
-                                                                    : 'bg-blue-100 text-blue-800'
+                                                                    ? darkMode ? 'bg-purple-900 text-purple-200' : 'bg-purple-100 text-purple-800' 
+                                                                    : darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'
                                                                 }`}>
                                                                     {post.category}
                                                                 </span>
                                                                 {post.isSpecial && (
-                                                                    <span className="bg-purple-100 text-purple-800 text-xs font-semibold px-2.5 py-0.5 rounded">
+                                                                    <span className={`text-xs font-semibold px-2.5 py-0.5 rounded ${
+                                                                        darkMode ? 'bg-purple-900 text-purple-200' : 'bg-purple-100 text-purple-800'
+                                                                    }`}>
                                                                         Special
                                                                     </span>
                                                                 )}
                                                             </div>
                                                         </div>
-                                                        <p className="text-gray-600 text-sm mb-4">{post.description}</p>
+                                                        <p className={`text-sm mb-4 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{post.description}</p>
                                                         {post.isSpecial && post.specialFeatures && (
-                                                            <p className="text-sm text-purple-600 mb-4">
+                                                            <p className={`text-sm mb-4 ${darkMode ? 'text-purple-300' : 'text-purple-600'}`}>
                                                                 Special Features: {post.specialFeatures}
                                                             </p>
                                                         )}
                                                         <div className="flex justify-between items-center">
-                                                            <span className="text-lg font-bold text-green-600">{post.priceText}</span>
+                                                            <span className={`text-lg font-bold ${darkMode ? 'text-green-400' : 'text-green-600'}`}>{post.priceText}</span>
                                                             <div className="flex gap-2">
                                                                 <button
                                                                     onClick={() => handleEdit(post)}
@@ -974,14 +1242,59 @@ const Dashboard = () => {
                                         </div>
                                     ))}
                                 </div>
+
+                                {/* Pagination Controls for Posts */}
+                                {filteredPosts.length > postsPerPage && (
+                                    <div className="flex justify-center mt-6">
+                                        <div className={`inline-flex rounded-md shadow-sm ${darkMode ? 'bg-gray-700' : 'bg-white'}`}>
+                                            <button
+                                                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                                disabled={currentPage === 1}
+                                                className={`relative inline-flex items-center px-4 py-2 rounded-l-md border ${
+                                                    darkMode ? 'border-gray-600 text-gray-300' : 'border-gray-300 text-gray-700'
+                                                } ${
+                                                    currentPage === 1 
+                                                    ? darkMode ? 'bg-gray-800 cursor-not-allowed' : 'bg-gray-100 cursor-not-allowed' 
+                                                    : darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-white hover:bg-gray-50'
+                                                }`}
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                    <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                                                </svg>
+                                                <span className="ml-1">Previous</span>
+                                            </button>
+                                            <div className={`relative inline-flex items-center px-4 py-2 border ${
+                                                darkMode ? 'border-gray-600 bg-gray-700 text-gray-100' : 'border-gray-300 bg-white text-gray-700'
+                                            }`}>
+                                                Page {currentPage} of {totalPostPages}
+                                            </div>
+                                            <button
+                                                onClick={() => setCurrentPage(prev => Math.min(totalPostPages, prev + 1))}
+                                                disabled={currentPage >= totalPostPages}
+                                                className={`relative inline-flex items-center px-4 py-2 rounded-r-md border ${
+                                                    darkMode ? 'border-gray-600 text-gray-300' : 'border-gray-300 text-gray-700'
+                                                } ${
+                                                    currentPage >= totalPostPages
+                                                    ? darkMode ? 'bg-gray-800 cursor-not-allowed' : 'bg-gray-100 cursor-not-allowed' 
+                                                    : darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-white hover:bg-gray-50'
+                                                }`}
+                                            >
+                                                <span className="mr-1">Next</span>
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                             </>
                         )}
 
                         {activeTab === 'userOrders' && (
-                            <div className="bg-white rounded-lg shadow p-6">
+                            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow p-6`}>
                                 <div className="flex justify-between items-center mb-6">
-                                    <h2 className="text-2xl font-semibold">User Orders</h2>
-                                    <button 
+                                    <h2 className={`text-2xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>All Bookings</h2>
+                                        <button 
                                         onClick={fetchBookings}
                                         className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition duration-200"
                                     >
@@ -989,9 +1302,97 @@ const Dashboard = () => {
                                     </button>
                                 </div>
 
+                                {/* Booking Statistics */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
+                                    <div 
+                                        className={`${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-blue-50 border-blue-100'} p-4 rounded-lg border cursor-pointer`}
+                                        onClick={() => setSelectedBookingStatus('All')}
+                                    >
+                                        <div className="flex justify-between items-center">
+                                            <div className="flex flex-col">
+                                                <span className={`${darkMode ? 'text-blue-300' : 'text-blue-800'} text-sm font-medium`}>Total</span>
+                                                <span className={`text-2xl font-bold ${darkMode ? 'text-blue-200' : 'text-blue-600'}`}>{stats.totalOrders}</span>
+                                            </div>
+                                            <div className="bg-blue-500 rounded-full w-10 h-10 flex items-center justify-center">
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                                                </svg>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div 
+                                        className={`${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-yellow-50 border-yellow-100'} p-4 rounded-lg border cursor-pointer`}
+                                        onClick={() => setSelectedBookingStatus('pending')}
+                                    >
+                                        <div className="flex justify-between items-center">
+                                            <div className="flex flex-col">
+                                                <span className={`${darkMode ? 'text-yellow-300' : 'text-yellow-800'} text-sm font-medium`}>Pending</span>
+                                                <span className={`text-2xl font-bold ${darkMode ? 'text-yellow-200' : 'text-yellow-600'}`}>{stats.pendingOrders}</span>
+                                            </div>
+                                            <div className="bg-yellow-500 rounded-full w-10 h-10 flex items-center justify-center">
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div 
+                                        className={`${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-blue-50 border-blue-100'} p-4 rounded-lg border cursor-pointer`}
+                                        onClick={() => setSelectedBookingStatus('confirmed')}
+                                    >
+                                        <div className="flex justify-between items-center">
+                                            <div className="flex flex-col">
+                                                <span className={`${darkMode ? 'text-blue-300' : 'text-blue-800'} text-sm font-medium`}>Confirmed</span>
+                                                <span className={`text-2xl font-bold ${darkMode ? 'text-blue-200' : 'text-blue-600'}`}>{stats.confirmedOrders}</span>
+                                            </div>
+                                            <div className="bg-blue-500 rounded-full w-10 h-10 flex items-center justify-center">
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div 
+                                        className={`${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-green-50 border-green-100'} p-4 rounded-lg border cursor-pointer`}
+                                        onClick={() => setSelectedBookingStatus('completed')}
+                                    >
+                                        <div className="flex justify-between items-center">
+                                            <div className="flex flex-col">
+                                                <span className={`${darkMode ? 'text-green-300' : 'text-green-800'} text-sm font-medium`}>Completed</span>
+                                                <span className={`text-2xl font-bold ${darkMode ? 'text-green-200' : 'text-green-600'}`}>{stats.completedOrders}</span>
+                                            </div>
+                                            <div className="bg-green-500 rounded-full w-10 h-10 flex items-center justify-center">
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div 
+                                        className={`${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-red-50 border-red-100'} p-4 rounded-lg border cursor-pointer`}
+                                        onClick={() => setSelectedBookingStatus('cancelled')}
+                                    >
+                                        <div className="flex justify-between items-center">
+                                            <div className="flex flex-col">
+                                                <span className={`${darkMode ? 'text-red-300' : 'text-red-800'} text-sm font-medium`}>Cancelled</span>
+                                                <span className={`text-2xl font-bold ${darkMode ? 'text-red-200' : 'text-red-600'}`}>{stats.cancelledOrders}</span>
+                                            </div>
+                                            <div className="bg-red-500 rounded-full w-10 h-10 flex items-center justify-center">
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 {/* Status Filter */}
-                                <div className="mb-6 bg-gray-50 p-4 rounded-lg">
-                                    <label className="block text-sm font-medium text-gray-700 mb-3">Filter by Status</label>
+                                <div className={`mb-6 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} p-4 rounded-lg`}>
+                                    <label className={`block text-sm font-medium ${darkMode ? 'text-gray-200' : 'text-gray-700'} mb-3`}>Filter by Status</label>
                                     <div className="flex flex-wrap gap-2">
                                         {['All', 'Pending', 'Confirmed', 'Completed', 'Cancelled'].map((status) => (
                                             <button
@@ -1004,7 +1405,9 @@ const Dashboard = () => {
                                                           status === 'Completed' ? 'bg-green-500 text-white shadow-md' :
                                                           status === 'Cancelled' ? 'bg-red-500 text-white shadow-md' :
                                                           'bg-blue-500 text-white shadow-md'
-                                                        : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                                                        : darkMode 
+                                                          ? 'bg-gray-600 text-gray-200 hover:bg-gray-500 border border-gray-600' 
+                                                          : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
                                                 }`}
                                             >
                                                 {status}
@@ -1013,124 +1416,356 @@ const Dashboard = () => {
                                     </div>
                                 </div>
 
+                                {/* Payment Method Filter */}
+                                <div className={`mb-6 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} p-4 rounded-lg`}>
+                                    <label className={`block text-sm font-medium ${darkMode ? 'text-gray-200' : 'text-gray-700'} mb-3`}>Filter by Payment Method</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        <button
+                                            onClick={() => setSelectedPaymentMethod('All')}
+                                            className={`px-3 py-1.5 text-sm font-medium rounded-full transition-all duration-200 ${
+                                                selectedPaymentMethod === 'All'
+                                                    ? 'bg-blue-500 text-white shadow-md'
+                                                    : darkMode 
+                                                      ? 'bg-gray-600 text-gray-200 hover:bg-gray-500 border border-gray-600' 
+                                                      : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                                            }`}
+                                        >
+                                            All Methods
+                                        </button>
+                                        <button
+                                            onClick={() => setSelectedPaymentMethod('fib')}
+                                            className={`px-3 py-1.5 text-sm font-medium rounded-full transition-all duration-200 ${
+                                                selectedPaymentMethod === 'fib'
+                                                    ? 'bg-green-500 text-white shadow-md'
+                                                    : darkMode 
+                                                      ? 'bg-gray-600 text-gray-200 hover:bg-gray-500 border border-gray-600' 
+                                                      : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                                            }`}
+                                        >
+                                            FIB Bank
+                                        </button>
+                                        <button
+                                            onClick={() => setSelectedPaymentMethod('fastpay')}
+                                            className={`px-3 py-1.5 text-sm font-medium rounded-full transition-all duration-200 ${
+                                                selectedPaymentMethod === 'fastpay'
+                                                    ? 'bg-pink-500 text-white shadow-md'
+                                                    : darkMode 
+                                                      ? 'bg-gray-600 text-gray-200 hover:bg-gray-500 border border-gray-600' 
+                                                      : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                                            }`}
+                                        >
+                                            FastPay
+                                        </button>
+                                        <button
+                                            onClick={() => setSelectedPaymentMethod('cash')}
+                                            className={`px-3 py-1.5 text-sm font-medium rounded-full transition-all duration-200 ${
+                                                selectedPaymentMethod === 'cash'
+                                                    ? 'bg-yellow-500 text-white shadow-md'
+                                                    : darkMode 
+                                                      ? 'bg-gray-600 text-gray-200 hover:bg-gray-500 border border-gray-600' 
+                                                      : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                                            }`}
+                                        >
+                                            Cash
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Add Date Range Filter to All Bookings section */}
+                                <div className={`mb-6 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} p-4 rounded-lg`}>
+                                    <label className={`block text-sm font-medium ${darkMode ? 'text-gray-200' : 'text-gray-700'} mb-3`}>Filter by Date Range</label>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className={`block text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>Start Date</label>
+                                            <input 
+                                                type="date" 
+                                                value={bookingStartDate}
+                                                onChange={(e) => {
+                                                    setBookingStartDate(e.target.value);
+                                                    setCurrentPage(1); // Reset to first page when filter changes
+                                                }}
+                                                className={`w-full p-2 rounded-md ${
+                                                    darkMode 
+                                                    ? 'bg-gray-600 border-gray-500 text-gray-200' 
+                                                    : 'bg-white border-gray-300 text-gray-800'
+                                                } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className={`block text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>End Date</label>
+                                            <input 
+                                                type="date" 
+                                                value={bookingEndDate}
+                                                onChange={(e) => {
+                                                    setBookingEndDate(e.target.value);
+                                                    setCurrentPage(1); // Reset to first page when filter changes
+                                                }}
+                                                className={`w-full p-2 rounded-md ${
+                                                    darkMode 
+                                                    ? 'bg-gray-600 border-gray-500 text-gray-200' 
+                                                    : 'bg-white border-gray-300 text-gray-800'
+                                                } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                                            />
+                                        </div>
+                                    </div>
+                                    {(bookingStartDate || bookingEndDate) && (
+                                        <div className="mt-2 flex justify-end">
+                                            <button
+                                                onClick={() => {
+                                                    setBookingStartDate('');
+                                                    setBookingEndDate('');
+                                                    setCurrentPage(1); // Reset to first page when dates are cleared
+                                                }}
+                                                className={`text-sm px-2 py-1 rounded ${
+                                                    darkMode 
+                                                    ? 'bg-gray-600 text-gray-200 hover:bg-gray-500' 
+                                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                                }`}
+                                            >
+                                                Clear Dates
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+
                                 {isLoadingBookings ? (
                                     <div className="text-center py-8">
                                         <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
-                                        <p className="mt-2 text-gray-500">Loading bookings...</p>
+                                        <p className={`mt-2 ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>Loading bookings...</p>
                                     </div>
                                 ) : bookings.length > 0 ? (
                                     <div className="overflow-x-auto">
-                                        <table className="min-w-full bg-white">
-                                            <thead className="bg-gray-100">
+                                        {/* Result count indicator */}
+                                        <div className={`${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'} p-3 rounded-t-lg border border-b-0`}>
+                                            <div className="flex justify-between items-center">
+                                                <span className={`${darkMode ? 'text-gray-200' : 'text-gray-700'} font-medium`}>
+                                                    {(() => {
+                                                        const filteredBookings = bookings.filter(booking => 
+                                                            (selectedBookingStatus === 'All' || booking.status === selectedBookingStatus) &&
+                                                            (selectedPaymentMethod === 'All' || booking.paymentMethod === selectedPaymentMethod)
+                                                        );
+                                                        return `Showing ${filteredBookings.length} of ${bookings.length} bookings`;
+                                                    })()}
+                                                </span>
+                                                <div className="flex space-x-2">
+                                                    {selectedBookingStatus !== 'All' && (
+                                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                                            darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'
+                                                        }`}>
+                                                            Status: {selectedBookingStatus.charAt(0).toUpperCase() + selectedBookingStatus.slice(1)}
+                                                            <button 
+                                                                onClick={() => {
+                                                                    setSelectedBookingStatus('All');
+                                                                    setCurrentPage(1); // Reset to first page when filter changes
+                                                                }}
+                                                                className={`ml-1 ${darkMode ? 'text-blue-300 hover:text-blue-100' : 'text-blue-600 hover:text-blue-800'}`}
+                                                            >
+                                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                                                                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                                                </svg>
+                                                            </button>
+                                                        </span>
+                                                    )}
+                                                    {selectedPaymentMethod !== 'All' && (
+                                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                                            darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'
+                                                        }`}>
+                                                            Payment: {selectedPaymentMethod === 'fib' ? 'FIB Bank' : 
+                                                                    selectedPaymentMethod === 'fastpay' ? 'FastPay' : 
+                                                                    selectedPaymentMethod === 'cash' ? 'Cash' : 
+                                                                    selectedPaymentMethod}
+                                                            <button 
+                                                                onClick={() => {
+                                                                    setSelectedPaymentMethod('All');
+                                                                    setCurrentPage(1); // Reset to first page when filter changes
+                                                                }}
+                                                                className={`ml-1 ${darkMode ? 'text-blue-300 hover:text-blue-100' : 'text-blue-600 hover:text-blue-800'}`}
+                                                            >
+                                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                                                                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                                                </svg>
+                                                            </button>
+                                                        </span>
+                                                    )}
+                                                    {(bookingStartDate || bookingEndDate) && (
+                                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                                            darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'
+                                                        }`}>
+                                                            Date: {bookingStartDate ? new Date(bookingStartDate).toLocaleDateString() : 'Any'} - {bookingEndDate ? new Date(bookingEndDate).toLocaleDateString() : 'Any'}
+                                                            <button 
+                                                                onClick={() => {
+                                                                    setBookingStartDate('');
+                                                                    setBookingEndDate('');
+                                                                    setCurrentPage(1); // Reset to first page when dates are cleared
+                                                                }}
+                                                                className={`ml-1 ${darkMode ? 'text-blue-300 hover:text-blue-100' : 'text-blue-600 hover:text-blue-800'}`}
+                                                            >
+                                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                                                                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                                                </svg>
+                                                            </button>
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <table className={`min-w-full ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                                            <thead className={`${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
                                                 <tr>
-                                                    <th className="py-2 px-4 border-b text-left">Booking ID</th>
-                                                    <th className="py-2 px-4 border-b text-left">Username</th>
-                                                    <th className="py-2 px-4 border-b text-left">Event Date</th>
-                                                    <th className="py-2 px-4 border-b text-left">Total Price</th>
-                                                    <th className="py-2 px-4 border-b text-left">Payment Method</th>
-                                                    <th className="py-2 px-4 border-b text-left">Phone Number</th>
-                                                    <th className="py-2 px-4 border-b text-left">Address</th>
-                                                    <th className="py-2 px-4 border-b text-left">Status</th>
-                                                    <th className="py-2 px-4 border-b text-left">Actions</th>
+                                                    <th className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600 text-gray-200' : 'border-gray-200 text-gray-700'} text-left`}>Booking ID</th>
+                                                    <th className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600 text-gray-200' : 'border-gray-200 text-gray-700'} text-left`}>Username</th>
+                                                    <th className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600 text-gray-200' : 'border-gray-200 text-gray-700'} text-left`}>Event Date</th>
+                                                    <th className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600 text-gray-200' : 'border-gray-200 text-gray-700'} text-left`}>Total Price</th>
+                                                    <th className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600 text-gray-200' : 'border-gray-200 text-gray-700'} text-left`}>Payment Method</th>
+                                                    <th className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600 text-gray-200' : 'border-gray-200 text-gray-700'} text-left`}>Phone Number</th>
+                                                    <th className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600 text-gray-200' : 'border-gray-200 text-gray-700'} text-left`}>Address</th>
+                                                    <th className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600 text-gray-200' : 'border-gray-200 text-gray-700'} text-left`}>Status</th>
+                                                    <th className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600 text-gray-200' : 'border-gray-200 text-gray-700'} text-left`}>Actions</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {bookings.filter(booking => 
-                                                    selectedBookingStatus === 'All' || booking.status === selectedBookingStatus
-                                                ).map((booking) => (
-                                                    <tr key={booking.id} className="hover:bg-gray-50">
-                                                        <td className="py-2 px-4 border-b">#{booking.id}</td>
-                                                        <td className="py-2 px-4 border-b">
-                                                            {booking.User ? (
-                                                                <span className="font-medium text-gray-700">
-                                                                    {booking.User.username}
+                                                {(() => {
+                                                    // Calculate pagination for filtered bookings
+                                                    const indexOfLastBooking = currentPage * bookingsPerPage;
+                                                    const indexOfFirstBooking = indexOfLastBooking - bookingsPerPage;
+                                                    const currentBookings = filteredBookings.slice(indexOfFirstBooking, indexOfLastBooking);
+                                                    
+                                                    return currentBookings.map((booking) => (
+                                                        <tr key={booking.id} className={`${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}`}>
+                                                            <td className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600 text-gray-200' : 'border-gray-200'}`}>#{booking.id}</td>
+                                                            <td className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}>
+                                                                {booking.User ? (
+                                                                    <span className={`font-medium ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+                                                                        {booking.User.username}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className={`italic ${darkMode ? 'text-gray-400' : 'text-gray-400'}`}>
+                                                                        Unknown
+                                                                    </span>
+                                                                )}
+                                                            </td>
+                                                            <td className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600 text-gray-200' : 'border-gray-200'}`}>{formatDate(booking.eventDate)}</td>
+                                                            <td className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600 text-gray-200' : 'border-gray-200'}`}>${parseFloat(booking.totalPrice).toFixed(2)}</td>
+                                                            <td className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}>
+                                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                                                    booking.paymentMethod === 'fib' ? 'bg-green-100 text-green-800' :
+                                                                    booking.paymentMethod === 'fastpay' ? 'bg-pink-100 text-pink-800' :
+                                                                    booking.paymentMethod === 'cash' ? 'bg-yellow-100 text-yellow-800' :
+                                                                    'bg-gray-100 text-gray-800'
+                                                                }`}>
+                                                                    {booking.paymentMethod === 'fib' ? 'FIB Bank' :
+                                                                    booking.paymentMethod === 'fastpay' ? 'FastPay' :
+                                                                    booking.paymentMethod === 'cash' ? 'Cash' :
+                                                                    booking.paymentMethod}
                                                                 </span>
-                                                            ) : (
-                                                                <span className="text-gray-400 italic">
-                                                                    Unknown
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                        <td className="py-2 px-4 border-b">{formatDate(booking.eventDate)}</td>
-                                                        <td className="py-2 px-4 border-b">${parseFloat(booking.totalPrice).toFixed(2)}</td>
-                                                        <td className="py-2 px-4 border-b">
-                                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                                                booking.paymentMethod === 'fib' ? 'bg-green-100 text-green-800' :
-                                                                booking.paymentMethod === 'fastpay' ? 'bg-pink-100 text-pink-800' :
-                                                                booking.paymentMethod === 'cash' ? 'bg-yellow-100 text-yellow-800' :
-                                                                'bg-gray-100 text-gray-800'
-                                                            }`}>
-                                                                {booking.paymentMethod === 'fib' ? 'FIB Bank' :
-                                                                 booking.paymentMethod === 'fastpay' ? 'FastPay' :
-                                                                 booking.paymentMethod === 'cash' ? 'Cash' :
-                                                                 booking.paymentMethod}
-                                                            </span>
-                                                        </td>
-                                                        <td className="py-2 px-4 border-b">{booking.phoneNumber}</td>
-                                                        <td className="py-2 px-4 border-b">
-                                                            <div className="max-w-xs truncate" title={booking.address}>
-                                                                {booking.address}
-                                                            </div>
-                                                        </td>
-                                                        <td className="py-2 px-4 border-b">
-                                                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                                                                booking.status === 'completed' ? 'bg-green-500 text-white' :
-                                                                booking.status === 'confirmed' ? 'bg-blue-500 text-white' :
-                                                                booking.status === 'pending' ? 'bg-yellow-500 text-white' :
-                                                                booking.status === 'cancelled' ? 'bg-red-500 text-white' :
-                                                                'bg-gray-500 text-white'
-                                                            }`}>
-                                                                {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-                                                            </span>
-                                                        </td>
-                                                        <td className="py-2 px-4 border-b">
-                                                            <div className="flex items-center space-x-2">
-                                                                <button 
-                                                                    className="text-blue-500 hover:text-blue-700"
-                                                                    onClick={() => viewBookingDetails(booking.id)}
-                                                                >
-                                                                    View
-                                                                </button>
-                                                                
-                                                                <div className="relative inline-block text-left">
-                                                                    <select
-                                                                        className="text-sm border border-gray-300 rounded-md py-1 px-2 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                                        onChange={(e) => {
-                                                                            if (e.target.value && e.target.value !== booking.status) {
-                                                                                if (window.confirm(`Change status to ${e.target.value}?`)) {
-                                                                                    updateBookingStatus(booking.id, e.target.value);
-                                                                                }
-                                                                                e.target.value = "";  // Reset after action
-                                                                            }
-                                                                        }}
-                                                                        defaultValue=""
-                                                                    >
-                                                                        <option value="" disabled>Change Status</option>
-                                                                        {booking.status !== 'pending' && <option value="pending">Pending</option>}
-                                                                        {booking.status !== 'confirmed' && <option value="confirmed">Confirmed</option>}
-                                                                        {booking.status !== 'completed' && <option value="completed">Complete</option>}
-                                                                        {booking.status !== 'cancelled' && <option value="cancelled">Cancelled</option>}
-                                                                    </select>
+                                                            </td>
+                                                            <td className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600 text-gray-200' : 'border-gray-200'}`}>{booking.phoneNumber}</td>
+                                                            <td className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}>
+                                                                <div className={`max-w-xs truncate ${darkMode ? 'text-gray-200' : ''}`} title={booking.address}>
+                                                                    {booking.address}
                                                                 </div>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))}
+                                                            </td>
+                                                            <td className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}>
+                                                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                                                    booking.status === 'completed' ? 'bg-green-500 text-white' :
+                                                                    booking.status === 'confirmed' ? 'bg-blue-500 text-white' :
+                                                                    booking.status === 'pending' ? 'bg-yellow-500 text-white' :
+                                                                    booking.status === 'cancelled' ? 'bg-red-500 text-white' :
+                                                                    'bg-gray-500 text-white'
+                                                                }`}>
+                                                                    {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                                                                </span>
+                                                            </td>
+                                                            <td className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}>
+                                                                <div className="flex items-center space-x-2">
+                                                                    <button 
+                                                                        className={`${darkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-500 hover:text-blue-700'}`}
+                                                                        onClick={() => viewBookingDetails(booking.id)}
+                                                                    >
+                                                                        View
+                                                                    </button>
+                                                                    
+                                                                    <div className="relative inline-block text-left">
+                                                                        <select
+                                                                            className={`text-sm border rounded-md py-1 px-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                                                                darkMode 
+                                                                                  ? 'bg-gray-700 border-gray-600 text-gray-200' 
+                                                                                  : 'bg-white border-gray-300'
+                                                                            }`}
+                                                                            onChange={(e) => {
+                                                                                if (e.target.value && e.target.value !== booking.status) {
+                                                                                    if (window.confirm(`Change status to ${e.target.value}?`)) {
+                                                                                        updateBookingStatus(booking.id, e.target.value);
+                                                                                    }
+                                                                                    e.target.value = "";  // Reset after action
+                                                                                }
+                                                                            }}
+                                                                            defaultValue=""
+                                                                        >
+                                                                            <option value="" disabled>Change Status</option>
+                                                                            {booking.status !== 'pending' && <option value="pending">Pending</option>}
+                                                                            {booking.status !== 'confirmed' && <option value="confirmed">Confirmed</option>}
+                                                                            {booking.status !== 'completed' && <option value="completed">Complete</option>}
+                                                                            {booking.status !== 'cancelled' && <option value="cancelled">Cancelled</option>}
+                                                                        </select>
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ));
+                                                })()}
                                             </tbody>
                                         </table>
+                                        
+                                        {/* Pagination Controls */}
+                                        <div className={`mt-4 flex justify-between items-center p-4 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'} rounded-b-lg border border-t-0`}>
+                                            <div>
+                                                <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                                                    Page {currentPage} of {Math.ceil(filteredBookings.length / bookingsPerPage)}
+                                                </span>
+                                            </div>
+                                            <div className="flex space-x-2">
+                                                <button
+                                                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                            disabled={currentPage === 1}
+                                                    className={`px-4 py-2 rounded-md ${
+                                                currentPage === 1
+                                                        ? 'bg-gray-200 text-gray-500 cursor-not-allowed' 
+                                                        : 'bg-blue-500 text-white hover:bg-blue-600'
+                                            }`}
+                                        >
+                                            Previous
+                                        </button>
+                                        <button 
+                                                    onClick={() => {
+                                                        const totalPages = Math.ceil(filteredBookings.length / bookingsPerPage);
+                                                        setCurrentPage(prev => Math.min(totalPages, prev + 1));
+                                                    }}
+                                                    disabled={currentPage >= Math.ceil(filteredBookings.length / bookingsPerPage)}
+                                                    className={`px-4 py-2 rounded-md ${
+                                                        currentPage >= Math.ceil(filteredBookings.length / bookingsPerPage)
+                                                        ? 'bg-gray-200 text-gray-500 cursor-not-allowed' 
+                                                        : 'bg-blue-500 text-white hover:bg-blue-600'
+                                            }`}
+                                        >
+                                            Next
+                                        </button>
+                                            </div>
+                                        </div>
                                     </div>
                                 ) : (
                                     <div className="text-center py-8">
-                                        <p className="text-gray-500">No bookings available.</p>
+                                        <p className={`${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>No bookings available.</p>
                                     </div>
                                 )}
                             </div>
                         )}
 
                         {activeTab === 'orderHistory' && (
-                            <div className="bg-white rounded-lg shadow p-6">
+                            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow p-6`}>
                                 <div className="flex justify-between items-center mb-6">
-                                    <h2 className="text-2xl font-semibold">Order History</h2>
+                                    <h2 className={`text-2xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Order History</h2>
                                     <button 
                                         onClick={fetchOrderHistory}
                                         className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition duration-200"
@@ -1139,55 +1774,384 @@ const Dashboard = () => {
                                     </button>
                                 </div>
 
+                                {/* Booking Statistics */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4 mb-6">
+                                    <div 
+                                        className={`${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-green-50 border-green-100'} p-4 rounded-lg border cursor-pointer`}
+                                        onClick={() => setSelectedOrderStatus('completed')}
+                                    >
+                                        <div className="flex justify-between items-center">
+                                            <div className="flex flex-col">
+                                                <span className={`${darkMode ? 'text-green-400' : 'text-green-800'} text-sm font-medium`}>Completed Orders</span>
+                                                <span className={`text-2xl font-bold ${darkMode ? 'text-green-300' : 'text-green-600'}`}>
+                                                    {orderHistory.filter(order => order.status === 'completed').length}
+                                                </span>
+                                            </div>
+                                            <div className="bg-green-500 rounded-full w-10 h-10 flex items-center justify-center">
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div 
+                                        className={`${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-red-50 border-red-100'} p-4 rounded-lg border cursor-pointer`}
+                                        onClick={() => setSelectedOrderStatus('cancelled')}
+                                    >
+                                        <div className="flex justify-between items-center">
+                                            <div className="flex flex-col">
+                                                <span className={`${darkMode ? 'text-red-400' : 'text-red-800'} text-sm font-medium`}>Cancelled Orders</span>
+                                                <span className={`text-2xl font-bold ${darkMode ? 'text-red-300' : 'text-red-600'}`}>
+                                                    {orderHistory.filter(order => order.status === 'cancelled').length}
+                                                </span>
+                                            </div>
+                                            <div className="bg-red-500 rounded-full w-10 h-10 flex items-center justify-center">
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Status Filter */}
+                                <div className={`mb-6 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} p-4 rounded-lg`}>
+                                    <label className={`block text-sm font-medium ${darkMode ? 'text-gray-200' : 'text-gray-700'} mb-3`}>Filter by Status</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        <button
+                                            onClick={() => setSelectedOrderStatus('All')}
+                                            className={`px-3 py-1.5 text-sm font-medium rounded-full transition-all duration-200 ${
+                                                selectedOrderStatus === 'All'
+                                                    ? 'bg-blue-500 text-white shadow-md'
+                                                    : darkMode 
+                                                      ? 'bg-gray-600 text-gray-200 hover:bg-gray-500'
+                                                      : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                                            }`}
+                                        >
+                                            All
+                                        </button>
+                                        <button
+                                            onClick={() => setSelectedOrderStatus('completed')}
+                                            className={`px-3 py-1.5 text-sm font-medium rounded-full transition-all duration-200 ${
+                                                selectedOrderStatus === 'completed'
+                                                    ? 'bg-green-500 text-white shadow-md'
+                                                    : darkMode 
+                                                      ? 'bg-gray-600 text-gray-200 hover:bg-gray-500'
+                                                      : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                                            }`}
+                                        >
+                                            Completed
+                                        </button>
+                                        <button
+                                            onClick={() => setSelectedOrderStatus('cancelled')}
+                                            className={`px-3 py-1.5 text-sm font-medium rounded-full transition-all duration-200 ${
+                                                selectedOrderStatus === 'cancelled'
+                                                    ? 'bg-red-500 text-white shadow-md'
+                                                    : darkMode 
+                                                      ? 'bg-gray-600 text-gray-200 hover:bg-gray-500'
+                                                      : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                                            }`}
+                                        >
+                                            Cancelled
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Payment Method Filter */}
+                                <div className={`mb-6 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} p-4 rounded-lg`}>
+                                    <label className={`block text-sm font-medium ${darkMode ? 'text-gray-200' : 'text-gray-700'} mb-3`}>Filter by Payment Method</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        <button
+                                            onClick={() => setSelectedOrderPaymentMethod('All')}
+                                            className={`px-3 py-1.5 text-sm font-medium rounded-full transition-all duration-200 ${
+                                                selectedOrderPaymentMethod === 'All'
+                                                    ? 'bg-blue-500 text-white shadow-md'
+                                                    : darkMode 
+                                                      ? 'bg-gray-600 text-gray-200 hover:bg-gray-500'
+                                                      : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                                            }`}
+                                        >
+                                            All Methods
+                                        </button>
+                                        <button
+                                            onClick={() => setSelectedOrderPaymentMethod('fib')}
+                                            className={`px-3 py-1.5 text-sm font-medium rounded-full transition-all duration-200 ${
+                                                selectedOrderPaymentMethod === 'fib'
+                                                    ? 'bg-green-500 text-white shadow-md'
+                                                    : darkMode 
+                                                      ? 'bg-gray-600 text-gray-200 hover:bg-gray-500'
+                                                      : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                                            }`}
+                                        >
+                                            FIB Bank
+                                        </button>
+                                        <button
+                                            onClick={() => setSelectedOrderPaymentMethod('fastpay')}
+                                            className={`px-3 py-1.5 text-sm font-medium rounded-full transition-all duration-200 ${
+                                                selectedOrderPaymentMethod === 'fastpay'
+                                                    ? 'bg-pink-500 text-white shadow-md'
+                                                    : darkMode 
+                                                      ? 'bg-gray-600 text-gray-200 hover:bg-gray-500'
+                                                      : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                                            }`}
+                                        >
+                                            FastPay
+                                        </button>
+                                        <button
+                                            onClick={() => setSelectedOrderPaymentMethod('cash')}
+                                            className={`px-3 py-1.5 text-sm font-medium rounded-full transition-all duration-200 ${
+                                                selectedOrderPaymentMethod === 'cash'
+                                                    ? 'bg-yellow-500 text-white shadow-md'
+                                                    : darkMode 
+                                                      ? 'bg-gray-600 text-gray-200 hover:bg-gray-500'
+                                                      : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                                            }`}
+                                        >
+                                            Cash
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Replace the Time Period Filter with Date Range Filter */}
+                                <div className={`mb-6 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} p-4 rounded-lg`}>
+                                    <label className={`block text-sm font-medium ${darkMode ? 'text-gray-200' : 'text-gray-700'} mb-3`}>Filter by Date Range</label>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className={`block text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>Start Date</label>
+                                            <input 
+                                                type="date" 
+                                                value={startDate}
+                                                onChange={(e) => {
+                                                    setStartDate(e.target.value);
+                                                    setSelectedOrderTimeframe('All'); // Reset timeframe filter when date is selected
+                                                }}
+                                                className={`w-full p-2 rounded-md ${
+                                                    darkMode 
+                                                    ? 'bg-gray-600 border-gray-500 text-gray-200' 
+                                                    : 'bg-white border-gray-300 text-gray-800'
+                                                } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className={`block text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>End Date</label>
+                                            <input 
+                                                type="date" 
+                                                value={endDate}
+                                                onChange={(e) => {
+                                                    setEndDate(e.target.value);
+                                                    setSelectedOrderTimeframe('All'); // Reset timeframe filter when date is selected
+                                                }}
+                                                className={`w-full p-2 rounded-md ${
+                                                    darkMode 
+                                                    ? 'bg-gray-600 border-gray-500 text-gray-200' 
+                                                    : 'bg-white border-gray-300 text-gray-800'
+                                                } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                                            />
+                                        </div>
+                                    </div>
+                                    {(startDate || endDate) && (
+                                        <div className="mt-2 flex justify-end">
+                                            <button
+                                                onClick={() => {
+                                                    setStartDate('');
+                                                    setEndDate('');
+                                                    setCurrentPage(1); // Reset to first page when dates are cleared
+                                                }}
+                                                className={`text-sm px-2 py-1 rounded ${
+                                                    darkMode 
+                                                    ? 'bg-gray-600 text-gray-200 hover:bg-gray-500' 
+                                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                                }`}
+                                            >
+                                                Clear Dates
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+
                                 {isLoadingOrders ? (
                                     <div className="text-center py-8">
                                         <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
-                                        <p className="mt-2 text-gray-500">Loading order history...</p>
+                                        <p className={`mt-2 ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>Loading order history...</p>
                                     </div>
                                 ) : orderHistory.length > 0 ? (
                                     <div className="overflow-x-auto">
-                                        <table className="min-w-full bg-white">
-                                            <thead className="bg-gray-100">
+                                        {/* Result count indicator */}
+                                        <div className={`${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'} p-3 rounded-t-lg border border-b-0`}>
+                                            <div className="flex justify-between items-center">
+                                                <span className={`${darkMode ? 'text-gray-200' : 'text-gray-700'} font-medium`}>
+                                                    {(() => {
+                                                        const filteredOrders = filteredOrderHistory.filter(order => 
+                                                            (selectedOrderStatus === 'All' || order.status === selectedOrderStatus) &&
+                                                            (selectedOrderPaymentMethod === 'All' || order.paymentMethod === selectedOrderPaymentMethod)
+                                                        );
+                                                        return `Showing ${filteredOrders.length} of ${filteredOrderHistory.length} orders`;
+                                                    })()}
+                                                </span>
+                                                <div className="flex space-x-2">
+                                                    {selectedOrderStatus !== 'All' && (
+                                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                            Status: {selectedOrderStatus.charAt(0).toUpperCase() + selectedOrderStatus.slice(1)}
+                                                            <button 
+                                                                onClick={() => {
+                                                                    setSelectedOrderStatus('All');
+                                                                    setCurrentPage(1); // Reset to first page when filter changes
+                                                                }}
+                                                                className="ml-1 text-blue-600 hover:text-blue-800"
+                                                            >
+                                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                                                                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                                                </svg>
+                                                            </button>
+                                                        </span>
+                                                    )}
+                                                    {selectedOrderPaymentMethod !== 'All' && (
+                                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                            Payment: {selectedOrderPaymentMethod === 'fib' ? 'FIB Bank' : 
+                                                                    selectedOrderPaymentMethod === 'fastpay' ? 'FastPay' : 
+                                                                    selectedOrderPaymentMethod === 'cash' ? 'Cash' : 
+                                                                    selectedOrderPaymentMethod}
+                                                            <button 
+                                                                onClick={() => {
+                                                                    setSelectedOrderPaymentMethod('All');
+                                                                    setCurrentPage(1); // Reset to first page when filter changes
+                                                                }}
+                                                                className="ml-1 text-blue-600 hover:text-blue-800"
+                                                            >
+                                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                                                                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                                                </svg>
+                                                            </button>
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <table className={`min-w-full ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                                            <thead className={`${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
                                                 <tr>
-                                                    <th className="py-2 px-4 border-b text-left">Order ID</th>
-                                                    <th className="py-2 px-4 border-b text-left">Customer</th>
-                                                    <th className="py-2 px-4 border-b text-left">Event</th>
-                                                    <th className="py-2 px-4 border-b text-left">Date</th>
-                                                    <th className="py-2 px-4 border-b text-left">Amount</th>
-                                                    <th className="py-2 px-4 border-b text-left">Status</th>
-                                                    <th className="py-2 px-4 border-b text-left">Actions</th>
+                                                    <th className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600 text-gray-200' : 'border-gray-200 text-gray-700'} text-left`}>Order ID</th>
+                                                    <th className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600 text-gray-200' : 'border-gray-200 text-gray-700'} text-left`}>Customer</th>
+                                                    <th className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600 text-gray-200' : 'border-gray-200 text-gray-700'} text-left`}>Event Date</th>
+                                                    <th className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600 text-gray-200' : 'border-gray-200 text-gray-700'} text-left`}>Amount</th>
+                                                    <th className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600 text-gray-200' : 'border-gray-200 text-gray-700'} text-left`}>Payment Method</th>
+                                                    <th className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600 text-gray-200' : 'border-gray-200 text-gray-700'} text-left`}>Status</th>
+                                                    <th className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600 text-gray-200' : 'border-gray-200 text-gray-700'} text-left`}>Actions</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {orderHistory.map((order) => (
-                                                    <tr key={order.id} className="hover:bg-gray-50">
-                                                        <td className="py-2 px-4 border-b">#{order.id}</td>
-                                                        <td className="py-2 px-4 border-b">{order.customerName}</td>
-                                                        <td className="py-2 px-4 border-b">{order.eventTitle}</td>
-                                                        <td className="py-2 px-4 border-b">{formatDate(order.orderDate)}</td>
-                                                        <td className="py-2 px-4 border-b">${order.amount}</td>
-                                                        <td className="py-2 px-4 border-b">
-                                                            <span className={`px-2 py-1 rounded-full text-xs ${
-                                                                order.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                                                                order.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
-                                                                order.status === 'Cancelled' ? 'bg-red-100 text-red-800' :
-                                                                'bg-gray-100 text-gray-800'
-                                                            }`}>
-                                                                {order.status}
-                                                            </span>
-                                                        </td>
-                                                        <td className="py-2 px-4 border-b">
-                                                            <button className="text-blue-500 hover:text-blue-700 mr-2">View</button>
-                                                            <button className="text-orange-500 hover:text-orange-700">Details</button>
-                                                        </td>
-                                                    </tr>
-                                                ))}
+                                                {(() => {
+                                                    // Filter orders based on selected filters
+                                                    const filteredOrders = filteredOrderHistory.filter(order => 
+                                                        (selectedOrderStatus === 'All' || order.status === selectedOrderStatus) &&
+                                                        (selectedOrderPaymentMethod === 'All' || order.paymentMethod === selectedOrderPaymentMethod)
+                                                    );
+                                                    
+                                                    // Calculate pagination
+                                                    const indexOfLastOrder = currentOrderPage * ordersPerPage;
+                                                    const indexOfFirstOrder = indexOfLastOrder - ordersPerPage;
+                                                    const currentOrders = filteredOrders.slice(indexOfFirstOrder, indexOfLastOrder);
+                                                    
+                                                    return currentOrders.map((order) => (
+                                                        <tr key={order.id} className={`${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}`}>
+                                                            <td className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600 text-gray-200' : 'border-gray-200'}`}>#{order.id}</td>
+                                                            <td className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600 text-gray-200' : 'border-gray-200'}`}>
+                                                                {order.User ? order.User.username : 'Unknown'}
+                                                            </td>
+                                                            <td className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600 text-gray-200' : 'border-gray-200'}`}>{formatDate(order.eventDate)}</td>
+                                                            <td className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600 text-gray-200' : 'border-gray-200'}`}>${parseFloat(order.totalPrice).toFixed(2)}</td>
+                                                            <td className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}>
+                                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                                                    order.paymentMethod === 'fib' ? 'bg-green-100 text-green-800' :
+                                                                    order.paymentMethod === 'fastpay' ? 'bg-pink-100 text-pink-800' :
+                                                                    order.paymentMethod === 'cash' ? 'bg-yellow-100 text-yellow-800' :
+                                                                    'bg-gray-100 text-gray-800'
+                                                                }`}>
+                                                                    {order.paymentMethod === 'fib' ? 'FIB Bank' :
+                                                                    order.paymentMethod === 'fastpay' ? 'FastPay' :
+                                                                    order.paymentMethod === 'cash' ? 'Cash' :
+                                                                    order.paymentMethod}
+                                                                </span>
+                                                            </td>
+                                                            <td className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}>
+                                                                <span className={`px-2 py-1 rounded-full text-xs ${
+                                                                    order.status === 'completed' ? 'bg-green-500 text-white' :
+                                                                    order.status === 'cancelled' ? 'bg-red-500 text-white' :
+                                                                    'bg-gray-500 text-white'
+                                                                }`}>
+                                                                    {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                                                                </span>
+                                                            </td>
+                                                            <td className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600 text-gray-200' : 'border-gray-200'}`}>
+                                                                <button 
+                                                                    className="text-blue-500 hover:text-blue-700"
+                                                                    onClick={() => viewBookingDetails(order.id)}
+                                                                >
+                                                                    View Details
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    ));
+                                                })()}
                                             </tbody>
                                         </table>
+                                        
+                                        {/* Pagination Controls */}
+                                        <div className={`mt-4 flex justify-between items-center p-4 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'} rounded-b-lg border border-t-0`}>
+                                            <div>
+                                                <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                                                    Page {currentOrderPage} of {Math.ceil(filteredOrderHistory.filter(order => 
+                                                        (selectedOrderStatus === 'All' || order.status === selectedOrderStatus) &&
+                                                        (selectedOrderPaymentMethod === 'All' || order.paymentMethod === selectedOrderPaymentMethod)
+                                                    ).length / ordersPerPage)}
+                                                </span>
+                                            </div>
+                                            <div className="flex space-x-2">
+                                                <button
+                                                    onClick={() => setCurrentOrderPage(prev => Math.max(1, prev - 1))}
+                                                    disabled={currentOrderPage === 1}
+                                                    className={`px-4 py-2 rounded-md ${
+                                                        currentOrderPage === 1 
+                                                        ? 'bg-gray-200 text-gray-500 cursor-not-allowed' 
+                                                        : 'bg-blue-500 text-white hover:bg-blue-600'
+                                                    }`}
+                                                >
+                                                    Previous
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        const filteredOrders = filteredOrderHistory.filter(order => 
+                                                            (selectedOrderStatus === 'All' || order.status === selectedOrderStatus) &&
+                                                            (selectedOrderPaymentMethod === 'All' || order.paymentMethod === selectedOrderPaymentMethod)
+                                                        );
+                                                        const totalPages = Math.ceil(filteredOrders.length / ordersPerPage);
+                                                        setCurrentOrderPage(prev => Math.min(totalPages, prev + 1));
+                                                    }}
+                                                    disabled={
+                                                        currentOrderPage >= Math.ceil(filteredOrderHistory.filter(order => 
+                                                            (selectedOrderStatus === 'All' || order.status === selectedOrderStatus) &&
+                                                            (selectedOrderPaymentMethod === 'All' || order.paymentMethod === selectedOrderPaymentMethod)
+                                                        ).length / ordersPerPage)
+                                                    }
+                                                    className={`px-4 py-2 rounded-md ${
+                                                        currentOrderPage >= Math.ceil(filteredOrderHistory.filter(order => 
+                                                            (selectedOrderStatus === 'All' || order.status === selectedOrderStatus) &&
+                                                            (selectedOrderPaymentMethod === 'All' || order.paymentMethod === selectedOrderPaymentMethod)
+                                                        ).length / ordersPerPage)
+                                                        ? 'bg-gray-200 text-gray-500 cursor-not-allowed' 
+                                                        : 'bg-blue-500 text-white hover:bg-blue-600'
+                                                    }`}
+                                                >
+                                                    Next
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
                                 ) : (
                                     <div className="text-center py-8">
-                                        <p className="text-gray-500">No order history available.</p>
+                                        <p className={`${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>No order history available.</p>
                                     </div>
                                 )}
                             </div>
@@ -1208,9 +2172,42 @@ const Dashboard = () => {
                         )}
 
                         {activeTab === 'settings' && (
-                            <div className="bg-white rounded-lg shadow p-6">
-                                <h2 className="text-2xl font-semibold mb-4">Settings</h2>
-                                <p className="text-gray-500">Settings section coming soon.</p>
+                            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow p-6`}>
+                                <h2 className={`text-2xl font-semibold mb-6 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Settings</h2>
+                                
+                                <div className="space-y-6">
+                                    {/* Dark Mode Toggle */}
+                                    <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <h3 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Dark Mode</h3>
+                                                <p className={`text-sm mt-1 ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>
+                                                    Toggle between light and dark theme
+                                                </p>
+                                            </div>
+                                            <label className="relative inline-flex items-center cursor-pointer">
+                                                <input 
+                                                    type="checkbox" 
+                                                    className="sr-only peer" 
+                                                    checked={darkMode}
+                                                    onChange={toggleDarkMode}
+                                                />
+                                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                                                <span className={`ml-3 text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-900'}`}>
+                                                    {darkMode ? 'On' : 'Off'}
+                                                </span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Additional Settings */}
+                                    <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                                        <h3 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Account Settings</h3>
+                                        <p className={`text-sm mt-1 ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>
+                                            More settings coming soon.
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
                         )}
 
