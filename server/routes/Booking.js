@@ -1,6 +1,6 @@
 const express=require('express');
 const router=express.Router();
-const {Booking, Users, Posts}=require('../models');
+const {Booking, Users, Posts, Notification}=require('../models');
 const { validateToken } = require('../middlewares/AuthMiddleware');
 
 // Log incoming requests
@@ -59,6 +59,20 @@ router.post('/', validateToken, async(req,res)=>{
         } catch (assocError) {
             console.error("Error setting associations:", assocError);
             // Continue even if associations fail
+        }
+        
+        // Create a notification for the user about their booking
+        try {
+            await Notification.create({
+                title: "Booking Confirmation",
+                content: `Your booking (#${newBooking.id}) has been received and is pending confirmation.`,
+                read: false,
+                UserId: req.user.id
+            });
+            console.log("Booking notification created for user:", req.user.id);
+        } catch (notifError) {
+            console.error("Error creating booking notification:", notifError);
+            // Continue even if notification creation fails
         }
         
         res.status(201).json({ 

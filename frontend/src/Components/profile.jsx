@@ -4,8 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { FaSignOutAlt } from "react-icons/fa";
 import { motion } from "framer-motion";
 import axios from "axios";
-
-
+import { BsBell, BsCheckCircle } from "react-icons/bs";
 
 const Profile = () => {
   const [activeTab, setActiveTab] = useState("personal");
@@ -271,18 +270,8 @@ const Profile = () => {
           )}
 
           {activeTab === "notifications" && (
-            <div>
-              <p className="text-gray-600 mb-4">Manage your email and push notifications here.</p>
-              <div className="space-y-3">
-                <label className="flex items-center space-x-3">
-                  <input type="checkbox" className="form-checkbox text-orange-500 rounded" />
-                  <span className="text-gray-700">Receive email updates</span>
-                </label>
-                <label className="flex items-center space-x-3">
-                  <input type="checkbox" className="form-checkbox text-orange-500 rounded" />
-                  <span className="text-gray-700">Receive SMS notifications</span>
-                </label>
-              </div>
+            <div className="p-4 w-full">
+              <NotificationsPanel />
             </div>
           )}
 
@@ -465,6 +454,156 @@ const Profile = () => {
           )}
         </motion.div>
       </div>
+    </div>
+  );
+};
+
+const NotificationsPanel = () => {
+  const [notifications, setNotifications] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchNotifications = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('http://localhost:3001/notification/user', {
+        headers: { accessToken: token }
+      });
+      setNotifications(response.data);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      setError('Failed to load notifications. Please try again later.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const markAsRead = async (notificationId) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.put(`http://localhost:3001/notification/${notificationId}/read`, {}, {
+        headers: { accessToken: token }
+      });
+      
+      // Update local state
+      setNotifications(prevNotifications => 
+        prevNotifications.map(notification => 
+          notification.id === notificationId 
+            ? { ...notification, read: true } 
+            : notification
+        )
+      );
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.put('http://localhost:3001/notification/user/mark-all-read', {}, {
+        headers: { accessToken: token }
+      });
+      
+      // Update local state
+      setNotifications(prevNotifications => 
+        prevNotifications.map(notification => ({ ...notification, read: true }))
+      );
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
+
+  const formatDate = (dateString) => {
+    const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+    return new Date(dateString).toLocaleDateString(undefined, options);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="text-center py-8">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
+        <p className="mt-2 text-gray-600">Loading notifications...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 bg-red-100 text-red-700 rounded-lg">
+        <p>{error}</p>
+        <button 
+          onClick={fetchNotifications}
+          className="mt-2 px-4 py-2 bg-red-200 text-red-700 rounded hover:bg-red-300"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-xl font-semibold text-gray-800">Your Notifications</h2>
+        {notifications.filter(n => !n.read).length > 0 && (
+          <button
+            onClick={markAllAsRead}
+            className="flex items-center px-3 py-1.5 bg-orange-500 text-white rounded-md hover:bg-orange-600 transition duration-200"
+          >
+            <BsCheckCircle className="mr-1" />
+            <span>Mark All as Read</span>
+          </button>
+        )}
+      </div>
+
+      {notifications.length === 0 ? (
+        <div className="text-center py-10 text-gray-500">
+          <BsBell style={{ fontSize: '3rem' }} className="mx-auto mb-4" />
+          <p>No notifications yet</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {notifications.map(notification => (
+            <div 
+              key={notification.id} 
+              className={`p-4 rounded-lg transition-all duration-200 ${
+                notification.read 
+                  ? 'bg-gray-50 border border-gray-200' 
+                  : 'bg-white border-l-4 border-l-orange-500 border-t border-r border-b border-gray-200 shadow-sm'
+              }`}
+            >
+              <div className="flex justify-between items-start">
+                <h3 className="font-semibold text-gray-800">
+                  {notification.title}
+                </h3>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-500">
+                    {formatDate(notification.createdAt)}
+                  </span>
+                  {!notification.read && (
+                    <button
+                      onClick={() => markAsRead(notification.id)}
+                      className="px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                    >
+                      Mark as Read
+                    </button>
+                  )}
+                </div>
+              </div>
+              <p className="mt-2 text-gray-600">
+                {notification.content}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

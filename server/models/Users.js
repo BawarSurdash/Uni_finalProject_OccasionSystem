@@ -32,6 +32,12 @@ module.exports=(sequelize,DataTypes)=>{
         Users.hasMany(models.Booking, {
             onDelete: "cascade"
         });
-    };  
+        
+        // User can have many notifications
+        Users.hasMany(models.Notification, {
+            onDelete: "cascade"
+        });
+    };     
+        
     return Users;
 }

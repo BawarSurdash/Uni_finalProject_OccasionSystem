@@ -8,14 +8,13 @@ import About from './Components/about'
 import Contact from './Components/contact'
 import Signup from './Components/signup'
 import Login from './Components/login'
-import Dashboard from './Components/dashboard'
 import Profile from './Components/profile'
 import EventDetail from './Components/eventDetail'
 import ServicesDetail from './Components/servicesDetail'
 import OrderForm from './Components/orderform'
 import BookingSuccess from './Components/BookingSuccess'
 import BookingDetail from './Components/BookingDetail'
-
+import Dashboard from './Components/admin/Dashboard'
 function App() {
   return (
     <>

@@ -3,16 +3,47 @@ import logo from '../assets/imgs/logo.png';
 import { CgProfile } from "react-icons/cg";
 import { useState, useEffect } from 'react';
 import { HiMenu, HiX } from "react-icons/hi";
+import { BsBell } from "react-icons/bs";
+import axios from 'axios';
 
 const Navbar = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const [unreadCount, setUnreadCount] = useState(0);
 
     // Check auth status on component mount
     useEffect(() => {
         const token = localStorage.getItem('token');
         setIsLoggedIn(!!token);
+        
+        if (token) {
+            fetchUnreadCount();
+        }
     }, []);
+
+    // Fetch unread notification count
+    const fetchUnreadCount = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await axios.get('http://localhost:3001/notification/user/unread-count', {
+                headers: { accessToken: token }
+            });
+            setUnreadCount(response.data.count);
+        } catch (error) {
+            console.error('Error fetching unread notifications count:', error);
+        }
+    };
+
+    // Poll for unread notifications every 30 seconds
+    useEffect(() => {
+        if (!isLoggedIn) return;
+        
+        const interval = setInterval(() => {
+            fetchUnreadCount();
+        }, 30000);
+        
+        return () => clearInterval(interval);
+    }, [isLoggedIn]);
 
     const toggleMenu = () => {
         setIsOpen(!isOpen);
@@ -135,7 +166,23 @@ const Navbar = () => {
                             </>
                         )}
                         {isLoggedIn && (
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-4">
+                                {/* Notification Bell */}
+                                <div className="relative">
+                                    <Link
+                                        to="/profile"
+                                        className="flex items-center text-gray-700 transition-all duration-300
+                                        hover:text-orange-500"
+                                    >
+                                        <BsBell className="w-5 h-5" />
+                                        {unreadCount > 0 && (
+                                            <span className="absolute -top-2 -right-2 flex items-center justify-center w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full">
+                                                {unreadCount > 9 ? '9+' : unreadCount}
+                                            </span>
+                                        )}
+                                    </Link>
+                                </div>
+                                
                                 <span className="text-sm font-medium text-gray-600">
                                     {localStorage.getItem('username')}
                                 </span>
@@ -222,15 +269,34 @@ const Navbar = () => {
                             </>
                         )}
                         {isLoggedIn && (
-                            <Link 
-                                to="/profile" 
-                                className="block px-3 py-2 text-base font-medium text-gray-700 
-                                transition-all duration-300 hover:bg-orange-50 hover:translate-x-2 
-                                rounded-md border-l-4 border-transparent hover:border-orange-500"
-                                onClick={toggleMenu}
-                            >
-                                {localStorage.getItem('username')}
-                            </Link>
+                            <>
+                                <Link 
+                                    to="/profile" 
+                                    className="flex items-center px-3 py-2 text-base font-medium text-gray-700 
+                                    transition-all duration-300 hover:bg-orange-50 hover:translate-x-2 
+                                    rounded-md border-l-4 border-transparent hover:border-orange-500"
+                                    onClick={toggleMenu}
+                                >
+                                    <div className="flex items-center">
+                                        <BsBell className="w-5 h-5 mr-2" />
+                                        {unreadCount > 0 && (
+                                            <span className="ml-1 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                                                {unreadCount > 9 ? '9+' : unreadCount}
+                                            </span>
+                                        )}
+                                        <span className="ml-1">Notifications</span>
+                                    </div>
+                                </Link>
+                                <Link 
+                                    to="/profile" 
+                                    className="block px-3 py-2 text-base font-medium text-gray-700 
+                                    transition-all duration-300 hover:bg-orange-50 hover:translate-x-2 
+                                    rounded-md border-l-4 border-transparent hover:border-orange-500"
+                                    onClick={toggleMenu}
+                                >
+                                    {localStorage.getItem('username')}
+                                </Link>
+                            </>
                         )}
                     </div>
                 </div>
