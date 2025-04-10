@@ -72,7 +72,19 @@ router.post('/', validateToken, async(req,res)=>{
             console.log("Booking notification created for user:", req.user.id);
         } catch (notifError) {
             console.error("Error creating booking notification:", notifError);
-            // Continue even if notification creation fails
+        }
+        
+        // ADD THIS NEW NOTIFICATION FOR ADMINS
+        try {
+            const post = await Posts.findByPk(serviceId);
+            await Notification.create({
+                title: "New Booking Created",
+                content: `User ${req.user.username} booked "${post?.title || 'unknown service'}" for ${new Date(eventDate).toLocaleDateString()}`,
+                read: false  // No UserId means it's a system/admin notification
+            });
+            console.log("Admin notification created for new booking");
+        } catch (adminNotifError) {
+            console.error("Error creating admin notification:", adminNotifError);
         }
         
         res.status(201).json({ 
