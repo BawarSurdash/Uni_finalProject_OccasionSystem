@@ -23,6 +23,9 @@ app.use('/booking',bookingRouter);
 const notificationRouter=require('./routes/notification');
 app.use('/notification',notificationRouter);
 
+const feedbackRouter=require('./routes/feedback');
+app.use('/feedback',feedbackRouter);
+
 // Change from force:true to alter:true to avoid destroying data
 db.sequelize.sync({ alter: true }).then(()=>{
     console.log('Database has been synced');

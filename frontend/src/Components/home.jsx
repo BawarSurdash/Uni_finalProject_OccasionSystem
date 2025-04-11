@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useEffect, useState } from "react";
 import { FaRegWindowMaximize, FaClock, FaRegSmile, FaHeadset } from 'react-icons/fa';
+import { useTheme } from '../contexts/ThemeContext';
 
 const contentStyle = {
     margin: 0,
@@ -27,13 +28,14 @@ const contentStyle = {
 
 const Home = () => {
     const navigate = useNavigate();
+    const { darkMode } = useTheme();
 
     const handleBookNow = () => {
         navigate('/events');
     };
 
     return ( 
-        <div className="pt-16">
+        <div className={`pt-16 ${darkMode ? 'bg-gray-900' : ''}`} style={darkMode ? {backgroundColor: '#111827'} : {}}>
             <Navbar/>
             <Carousel 
                 arrows 
@@ -128,18 +130,18 @@ const Home = () => {
                 </div>
             </Carousel>
         
-            <div className="px-8 py-16 bg-gray-50">
+            <div className={`px-8 py-16 ${darkMode ? 'bg-gray-900' : 'bg-gray-50'} transition-colors duration-300`} style={darkMode ? {backgroundColor: '#111827'} : {}}>
                 <div className="max-w-6xl mx-auto">
                     {/* Stats Section */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-16 gap-y-8">
                         {/* Left Section - Title and Description */}
                         <div>
-                            <h2 className="text-4xl font-bold text-gray-900 leading-tight">
+                            <h2 className={`text-4xl font-bold ${darkMode ? '!text-white' : 'text-gray-900'} leading-tight transition-colors duration-300`} style={darkMode ? {color: 'white'} : {}}>
                                 Building Memories -<br/>
                                 Your Trusted Event<br/>
                                 Partner
                             </h2>
-                            <p className="text-gray-600 mt-4 max-w-md">
+                            <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'} mt-4 max-w-md transition-colors duration-300`} style={darkMode ? {color: '#D1D5DB'} : {}}>
                                 Find out more about our team, vision, and dedication to creating 
                                 extraordinary experiences. In this section, we share our story and our 
                                 commitment to the success of each event.
@@ -149,39 +151,39 @@ const Home = () => {
                         {/* Right Section - Stats Grid */}
                         <div className="grid grid-cols-2 gap-6">
                             {/* 100K+ Stats */}
-                            <div className="bg-white rounded-lg p-6 transition-all duration-300 hover:bg-orange-500 group cursor-pointer hover:scale-105 hover:shadow-xl transform">
-                                <h3 className="text-3xl font-bold text-gray-900 group-hover:text-white transition-colors duration-300">100K+</h3>
-                                <p className="text-gray-600 text-sm mt-1 group-hover:text-white transition-colors duration-300">Events That Took Place</p>
+                            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg p-6 transition-all duration-300 hover:bg-orange-500 group cursor-pointer hover:scale-105 hover:shadow-xl transform`} style={darkMode ? {backgroundColor: '#1F2937'} : {}}>
+                                <h3 className="text-3xl font-bold text-gray-900 group-hover:text-white transition-colors duration-300" style={darkMode ? {color: 'white'} : {}}>100K+</h3>
+                                <p className="text-gray-600 text-sm mt-1 group-hover:text-white transition-colors duration-300" style={darkMode ? {color: '#D1D5DB'} : {}}>Events That Took Place</p>
                             </div>
 
                             {/* 1M Stats */}
-                            <div className="bg-white rounded-lg p-6 transition-all duration-300 hover:bg-orange-500 group cursor-pointer hover:scale-105 hover:shadow-xl transform">
-                                <h3 className="text-3xl font-bold text-gray-900 group-hover:text-white transition-colors duration-300">1M</h3>
-                                <p className="text-gray-600 text-sm mt-1 group-hover:text-white transition-colors duration-300">Active Users Reached</p>
+                            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg p-6 transition-all duration-300 hover:bg-orange-500 group cursor-pointer hover:scale-105 hover:shadow-xl transform`} style={darkMode ? {backgroundColor: '#1F2937'} : {}}>
+                                <h3 className="text-3xl font-bold text-gray-900 group-hover:text-white transition-colors duration-300" style={darkMode ? {color: 'white'} : {}}>1M</h3>
+                                <p className="text-gray-600 text-sm mt-1 group-hover:text-white transition-colors duration-300" style={darkMode ? {color: '#D1D5DB'} : {}}>Active Users Reached</p>
                             </div>
 
                             {/* 500+ Stats */}
-                            <div className="bg-white rounded-lg p-6 transition-all duration-300 hover:bg-orange-500 group cursor-pointer hover:scale-105 hover:shadow-xl transform">
-                                <h3 className="text-3xl font-bold text-gray-900 group-hover:text-white transition-colors duration-300">500+</h3>
-                                <p className="text-gray-600 text-sm mt-1 group-hover:text-white transition-colors duration-300">Existing Partnerships</p>
+                            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg p-6 transition-all duration-300 hover:bg-orange-500 group cursor-pointer hover:scale-105 hover:shadow-xl transform`} style={darkMode ? {backgroundColor: '#1F2937'} : {}}>
+                                <h3 className="text-3xl font-bold text-gray-900 group-hover:text-white transition-colors duration-300" style={darkMode ? {color: 'white'} : {}}>500+</h3>
+                                <p className="text-gray-600 text-sm mt-1 group-hover:text-white transition-colors duration-300" style={darkMode ? {color: '#D1D5DB'} : {}}>Existing Partnerships</p>
                             </div>
 
                             {/* 30+ Stats */}
-                            <div className="bg-white rounded-lg p-6 transition-all duration-300 hover:bg-orange-500 group cursor-pointer hover:scale-105 hover:shadow-xl transform">
-                                <h3 className="text-3xl font-bold text-gray-900 group-hover:text-white transition-colors duration-300">30+</h3>
-                                <p className="text-gray-600 text-sm mt-1 group-hover:text-white transition-colors duration-300">Award Winning</p>
+                            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg p-6 transition-all duration-300 hover:bg-orange-500 group cursor-pointer hover:scale-105 hover:shadow-xl transform`} style={darkMode ? {backgroundColor: '#1F2937'} : {}}>
+                                <h3 className="text-3xl font-bold text-gray-900 group-hover:text-white transition-colors duration-300" style={darkMode ? {color: 'white'} : {}}>30+</h3>
+                                <p className="text-gray-600 text-sm mt-1 group-hover:text-white transition-colors duration-300" style={darkMode ? {color: '#D1D5DB'} : {}}>Award Winning</p>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div className="px-8 py-16 bg-white">
+            <div className={`px-8 py-16 ${darkMode ? 'bg-gray-800' : 'bg-white'} transition-colors duration-300`} style={darkMode ? {backgroundColor: '#1F2937'} : {}}>
             {/* Event Corner Section */}
             <div className="max-w-6xl mx-auto">
                 <div className="mb-6 grid grid-cols-2 gap-4">
-                    <h2 className="text-4xl font-bold text-gray-900">Every Corner of Our Event</h2>
-                    <p className="text-gray-600 mt-4 max-w-xl">
+                    <h2 className={`text-4xl font-bold ${darkMode ? '!text-white' : 'text-gray-900'} transition-colors duration-300`} style={darkMode ? {color: 'white'} : {}}>Every Corner of Our Event</h2>
+                    <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'} mt-4 max-w-xl transition-colors duration-300`} style={darkMode ? {color: '#D1D5DB'} : {}}>
                         Find Togetherness and Friendship in Every Corner of Our Events depicts 
                         moments of closeness and a sense of brotherhood that exist during our events. 
                         These photos show how shared experiences can create lasting relationships.
@@ -226,59 +228,59 @@ const Home = () => {
                 </div>
             </div>
         </div> 
-        <div className="px-8 py-16 bg-gray-50">
+        <div className={`px-8 py-16 ${darkMode ? 'bg-gray-900' : 'bg-gray-50'} transition-colors duration-300`} style={darkMode ? {backgroundColor: '#111827'} : {}}>
             <div className="max-w-6xl mx-auto">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
                     {/* Left Side - Feature Cards */}
                     <div className="grid grid-cols-2 gap-4">
                         {/* Easy Online Reservations */}
-                        <div className="bg-white p-6 rounded-3xl shadow-sm transform transition-all duration-300 hover:scale-105 hover:shadow-xl hover:bg-orange-50">
+                        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-6 rounded-3xl shadow-sm transform transition-all duration-300 hover:scale-105 hover:shadow-xl ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-orange-50'}`} style={darkMode ? {backgroundColor: '#1F2937'} : {}}>
                             <div className="text-blue-500 mb-4 transition-colors duration-300 group-hover:text-orange-500">
                                 <FaRegWindowMaximize size={24} />
                             </div>
-                            <h3 className="font-semibold text-gray-900 mb-2 transition-colors duration-300 group-hover:text-orange-500">
+                            <h3 className={`font-semibold ${darkMode ? '!text-white' : 'text-gray-900'} mb-2 transition-colors duration-300 group-hover:text-orange-500`} style={darkMode ? {color: 'white'} : {}}>
                                 Easy Online Reservations
                             </h3>
-                            <p className="text-sm text-gray-500 leading-relaxed">
+                            <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-500'} leading-relaxed transition-colors duration-300`} style={darkMode ? {color: '#D1D5DB'} : {}}>
                                 Attendees can easily reserve their spots online with just a few clicks. Once booked, they can manage their reservations while ensuring a smooth and hassle-free reservation process.
                             </p>
                         </div>
 
                         {/* Real-Time Updates */}
-                        <div className="bg-white p-6 rounded-3xl shadow-sm transform transition-all duration-300 hover:scale-105 hover:shadow-xl hover:bg-orange-50">
+                        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-6 rounded-3xl shadow-sm transform transition-all duration-300 hover:scale-105 hover:shadow-xl ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-orange-50'}`} style={darkMode ? {backgroundColor: '#1F2937'} : {}}>
                             <div className="text-yellow-500 mb-4 transition-colors duration-300 group-hover:text-orange-500">
                                 <FaClock size={24} />
                             </div>
-                            <h3 className="font-semibold text-gray-900 mb-2 transition-colors duration-300 group-hover:text-orange-500">
+                            <h3 className={`font-semibold ${darkMode ? '!text-white' : 'text-gray-900'} mb-2 transition-colors duration-300 group-hover:text-orange-500`} style={darkMode ? {color: 'white'} : {}}>
                                 Real-Time Updates
                             </h3>
-                            <p className="text-sm text-gray-500 leading-relaxed">
+                            <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-500'} leading-relaxed transition-colors duration-300`} style={darkMode ? {color: '#D1D5DB'} : {}}>
                                 Stay informed with instant notifications about event details, bookings, and changes.
                             </p>
                         </div>
 
                         {/* User-Friendly Interface */}
-                        <div className="bg-white p-6 rounded-3xl shadow-sm transform transition-all duration-300 hover:scale-105 hover:shadow-xl hover:bg-orange-50">
+                        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-6 rounded-3xl shadow-sm transform transition-all duration-300 hover:scale-105 hover:shadow-xl ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-orange-50'}`} style={darkMode ? {backgroundColor: '#1F2937'} : {}}>
                             <div className="text-orange-500 mb-4 transition-colors duration-300 group-hover:text-orange-600">
                                 <FaRegSmile size={24} />
                             </div>
-                            <h3 className="font-semibold text-gray-900 mb-2 transition-colors duration-300 group-hover:text-orange-500">
+                            <h3 className={`font-semibold ${darkMode ? '!text-white' : 'text-gray-900'} mb-2 transition-colors duration-300 group-hover:text-orange-500`} style={darkMode ? {color: 'white'} : {}}>
                                 User-Friendly Interface
                             </h3>
-                            <p className="text-sm text-gray-500 leading-relaxed">
+                            <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-500'} leading-relaxed transition-colors duration-300`} style={darkMode ? {color: '#D1D5DB'} : {}}>
                                 A simple and intuitive design makes event booking and management effortless.
                             </p>
                         </div>
 
                         {/* Fast & Reliable Support */}
-                        <div className="bg-white p-6 rounded-3xl shadow-sm transform transition-all duration-300 hover:scale-105 hover:shadow-xl hover:bg-orange-50">
+                        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-6 rounded-3xl shadow-sm transform transition-all duration-300 hover:scale-105 hover:shadow-xl ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-orange-50'}`} style={darkMode ? {backgroundColor: '#1F2937'} : {}}>
                             <div className="text-green-500 mb-4 transition-colors duration-300 group-hover:text-orange-500">
                                 <FaHeadset size={24} />
                             </div>
-                            <h3 className="font-semibold text-gray-900 mb-2 transition-colors duration-300 group-hover:text-orange-500">
+                            <h3 className={`font-semibold ${darkMode ? '!text-white' : 'text-gray-900'} mb-2 transition-colors duration-300 group-hover:text-orange-500`} style={darkMode ? {color: 'white'} : {}}>
                                 Fast & Reliable Support
                             </h3>
-                            <p className="text-sm text-gray-500 leading-relaxed">
+                            <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-500'} leading-relaxed transition-colors duration-300`} style={darkMode ? {color: '#D1D5DB'} : {}}>
                                 Get quick responses to any inquiries or concerns about event reservations, ensuring a smooth and hassle-free booking experience.
                             </p>
                         </div>
@@ -286,11 +288,11 @@ const Home = () => {
 
                     {/* Right Side - Content */}
                     <div>
-                        <h2 className="text-4xl font-bold text-gray-900 mb-4">
+                        <h2 className={`text-4xl font-bold ${darkMode ? '!text-white' : 'text-gray-900'} mb-4 transition-colors duration-300`} style={darkMode ? {color: 'white'} : {}}>
                             Elevate Your Event to<br />
                             New Heights
                         </h2>
-                        <p className="text-gray-600 mb-8">
+                        <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-8 transition-colors duration-300`} style={darkMode ? {color: '#D1D5DB'} : {}}>
                             Our platform has many superior features, such as online ticket sales, 
                             attendee management, and real-time event statistics. These 
                             features help make your event planning and execution efficient.

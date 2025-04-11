@@ -40,6 +40,7 @@ module.exports=(sequelize,DataTypes)=>{
         Posts.hasMany(models.Booking, {
             onDelete: "cascade"
         });
+    
     };
     return Posts;
 }

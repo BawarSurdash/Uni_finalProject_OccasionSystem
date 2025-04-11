@@ -37,7 +37,9 @@ module.exports=(sequelize,DataTypes)=>{
         Users.hasMany(models.Notification, {
             onDelete: "cascade"
         });
-    };     
+
+    
+    };   
         
     return Users;
 }

@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import Navbar from './navbar';
+import { useTheme } from '../contexts/ThemeContext';
 
 const OrderForm = () => {
     const navigate = useNavigate();
     const { id } = useParams();
     const location = useLocation();
+    const { darkMode } = useTheme();
     const [itemDetails, setItemDetails] = useState(null);
     const [selectedAddons, setSelectedAddons] = useState(location.state?.selectedAddons || []);
     const [totalPrice, setTotalPrice] = useState(location.state?.totalPrice || 0);
@@ -179,7 +181,13 @@ const OrderForm = () => {
             
             // Only navigate if successful
             if (response.data.success) {
-                navigate('/success');
+                navigate('/success', { 
+                    state: { 
+                        postId: id,
+                        bookingId: response.data.booking.id,
+                        success: true
+                    } 
+                });
             } else {
                 alert('Error: ' + (response.data.message || 'Failed to create booking'));
             }
@@ -190,14 +198,14 @@ const OrderForm = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 pt-16">
+        <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gray-50'} pt-16`}>
             <Navbar />
             <div className="max-w-md mx-auto px-4 py-8">
-                <div className="bg-white rounded-lg shadow-sm p-6">
+                <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-sm p-6`}>
                     <div className="mb-6">
                         <button 
                             onClick={() => navigate(-1)}
-                            className="flex items-center text-gray-600 hover:text-gray-900"
+                            className={`flex items-center ${darkMode ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
                         >
                             <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
@@ -205,15 +213,15 @@ const OrderForm = () => {
                         </button>
                     </div>
 
-                    <h1 className="text-2xl font-bold text-center text-gray-900 mb-2">Book This Offer</h1>
+                    <h1 className={`text-2xl font-bold text-center ${darkMode ? 'text-white' : 'text-gray-900'} mb-2`}>Book This Offer</h1>
                     {itemDetails && (
                         <div className="text-center mb-6">
-                            <p className="text-lg text-gray-600 mb-2">{itemDetails.title}</p>
+                            <p className={`text-lg ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-2`}>{itemDetails.title}</p>
                             {/* Price Summary */}
-                            <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                            <div className={`mt-4 p-4 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
                                 <div className="flex justify-center items-center">
                                     <div className="text-center">
-                                        <p className="text-lg font-semibold text-gray-900">Total Price</p>
+                                        <p className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Total Price</p>
                                         <p className="text-3xl font-bold text-pink-500 mt-1">${totalPrice.toFixed(2)}</p>
                                     </div>
                                 </div>
@@ -223,7 +231,7 @@ const OrderForm = () => {
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
                                  Name
                             </label>
                             <input
@@ -231,12 +239,12 @@ const OrderForm = () => {
                                 name="fullName"
                                 value={formData.fullName}
                                 readOnly
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100"
+                                className={`w-full px-3 py-2 border ${darkMode ? 'border-gray-600 bg-gray-700 text-gray-300' : 'border-gray-300 bg-gray-100'} rounded-md`}
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
                                 Email
                             </label>
                             <input
@@ -244,18 +252,18 @@ const OrderForm = () => {
                                 name="email"
                                 value={formData.email}
                                 readOnly
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100"
+                                className={`w-full px-3 py-2 border ${darkMode ? 'border-gray-600 bg-gray-700 text-gray-300' : 'border-gray-300 bg-gray-100'} rounded-md`}
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
                                 Phone Number
                             </label>
                             <div className="flex gap-2">
                                 {/* Country Code */}
-                                <div className="flex items-center px-3 py-2 border border-r-0 border-gray-300 rounded-l-md bg-gray-50">
-                                    <span className="text-gray-600">+964</span>
+                                <div className={`flex items-center px-3 py-2 border border-r-0 ${darkMode ? 'border-gray-600 bg-gray-700 text-gray-300' : 'border-gray-300 bg-gray-50 text-gray-600'} rounded-l-md`}>
+                                    <span>+964</span>
                                 </div>
                                 {/* Phone Number Input */}
                                 <input
@@ -266,19 +274,19 @@ const OrderForm = () => {
                                     pattern="\d{10}"
                                     title="Enter 10-digit phone number (excluding country code)"
                                     maxLength={10}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-r-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                    className={`w-full px-3 py-2 border ${darkMode ? 'border-gray-600 bg-gray-700 text-gray-300' : 'border-gray-300'} rounded-r-md focus:outline-none focus:ring-2 focus:ring-orange-500`}
                                     placeholder="7701234567"
                                     required
                                 />
                             </div>
-                            <p className="text-xs text-gray-500 mt-1">
+                            <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} mt-1`}>
                                 Enter your 10-digit phone number
                             </p>
                         </div>
 
                         {/* New Address Field */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
                                  Address
                             </label>
                             <textarea
@@ -286,14 +294,14 @@ const OrderForm = () => {
                                 value={formData.address}
                                 onChange={handleChange}
                                 rows="3"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                className={`w-full px-3 py-2 border ${darkMode ? 'border-gray-600 bg-gray-700 text-gray-300' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500`}
                                 placeholder="Street name, Building number, District"
                                 required
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
                                 Event Date
                             </label>
                             <input
@@ -301,13 +309,13 @@ const OrderForm = () => {
                                 name="eventDate"
                                 value={formData.eventDate}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                className={`w-full px-3 py-2 border ${darkMode ? 'border-gray-600 bg-gray-700 text-gray-300' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500`}
                                 required
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
                                 Additional Requests
                             </label>
                             <textarea
@@ -315,14 +323,14 @@ const OrderForm = () => {
                                 value={formData.additionalRequests}
                                 onChange={handleChange}
                                 rows="3"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                className={`w-full px-3 py-2 border ${darkMode ? 'border-gray-600 bg-gray-700 text-gray-300' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500`}
                                 placeholder="Any special requirements or requests..."
                             />
                         </div>
 
                         {/* Payment Methods */}
-                        <div className="border-t pt-6 mb-6">
-                            <p className="text-sm text-gray-600 text-center mb-4">Select Payment Method</p>
+                        <div className={`border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'} pt-6 mb-6`}>
+                            <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'} text-center mb-4`}>Select Payment Method</p>
                             <div className="flex justify-center space-x-6">
                                 {/* FIB */}
                                 <div className="flex flex-col items-center">
@@ -331,12 +339,12 @@ const OrderForm = () => {
                                             formData.paymentMethod === 'fib' 
                                             ? 'bg-green-500 ring-2 ring-green-500 ring-offset-2' 
                                             : 'bg-green-500 hover:opacity-90'
-                                        }`}
+                                        } ${darkMode ? 'ring-offset-gray-800' : ''}`}
                                         onClick={() => handleChange({ target: { name: 'paymentMethod', value: 'fib' } })}
                                     >
                                         <span className="text-white font-bold">FIB</span>
                                     </div>
-                                    <span className="text-xs text-gray-600 mt-1">FIB Bank</span>
+                                    <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'} mt-1`}>FIB Bank</span>
                                 </div>
 
                                 {/* FastPay */}
@@ -346,12 +354,12 @@ const OrderForm = () => {
                                             formData.paymentMethod === 'fastpay' 
                                             ? 'bg-pink-500 ring-2 ring-pink-500 ring-offset-2' 
                                             : 'bg-pink-500 hover:opacity-90'
-                                        }`}
+                                        } ${darkMode ? 'ring-offset-gray-800' : ''}`}
                                         onClick={() => handleChange({ target: { name: 'paymentMethod', value: 'fastpay' } })}
                                     >
                                         <span className="font-bold text-white">Fast<span className="text-sm">Pay</span></span>
                                     </div>
-                                    <span className="text-xs text-gray-600 mt-1">FastPay</span>
+                                    <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'} mt-1`}>FastPay</span>
                                 </div>
 
                                 {/* Cash */}
@@ -361,14 +369,14 @@ const OrderForm = () => {
                                             formData.paymentMethod === 'cash' 
                                             ? 'bg-yellow-500 ring-2 ring-yellow-500 ring-offset-2' 
                                             : 'bg-yellow-500 hover:opacity-90'
-                                        }`}
+                                        } ${darkMode ? 'ring-offset-gray-800' : ''}`}
                                         onClick={() => handleChange({ target: { name: 'paymentMethod', value: 'cash' } })}
                                     >
                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                                         </svg>
                                     </div>
-                                    <span className="text-xs text-gray-600 mt-1">Cash</span>
+                                    <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'} mt-1`}>Cash</span>
                                 </div>
                             </div>
                             {formData.paymentMethod === '' && (
@@ -377,32 +385,32 @@ const OrderForm = () => {
 
                             {/* Payment Details Section */}
                             {(formData.paymentMethod === 'fib' || formData.paymentMethod === 'fastpay') && (
-                                <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                                <div className={`mt-6 p-4 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
                                     <div className="text-center mb-4">
                                         {/* Add Total Price Display */}
-                                        <div className="mb-4 pb-4 border-b border-gray-200">
-                                            <p className="text-sm text-gray-600">Total Amount to Pay:</p>
+                                        <div className={`mb-4 pb-4 border-b ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}>
+                                            <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Total Amount to Pay:</p>
                                             <p className="text-2xl font-bold text-pink-500 mt-1">
                                                 ${totalPrice.toFixed(2)}
                                             </p>
                                         </div>
-                                        <p className="text-sm text-gray-600">Please send payment to:</p>
-                                        <p className="text-lg font-semibold text-gray-800 mt-1">
+                                        <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Please send payment to:</p>
+                                        <p className={`text-lg font-semibold ${darkMode ? 'text-gray-200' : 'text-gray-800'} mt-1`}>
                                             {getPaymentDetails()?.number}
                                         </p>
-                                        <p className="text-sm text-gray-600 mt-1">
+                                        <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'} mt-1`}>
                                             {getPaymentDetails()?.name}
                                         </p>
                                     </div>
                                     
                                     <div className="mt-4">
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
                                             Upload Payment Proof
                                         </label>
-                                        <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-orange-500 transition-colors">
+                                        <div className={`mt-1 flex justify-center px-6 pt-5 pb-6 border-2 ${darkMode ? 'border-gray-600' : 'border-gray-300'} border-dashed rounded-md hover:border-orange-500 transition-colors`}>
                                             <div className="space-y-1 text-center">
                                                 <svg
-                                                    className="mx-auto h-12 w-12 text-gray-400"
+                                                    className={`mx-auto h-12 w-12 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}
                                                     stroke="currentColor"
                                                     fill="none"
                                                     viewBox="0 0 48 48"
@@ -415,7 +423,7 @@ const OrderForm = () => {
                                                         strokeLinejoin="round"
                                                     />
                                                 </svg>
-                                                <div className="flex text-sm text-gray-600">
+                                                <div className={`flex text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                                                     <label
                                                         htmlFor="payment-proof"
                                                         className="relative cursor-pointer rounded-md font-medium text-orange-500 hover:text-orange-600"
@@ -433,7 +441,7 @@ const OrderForm = () => {
                                                     </label>
                                                     <p className="pl-1">or drag and drop</p>
                                                 </div>
-                                                <p className="text-xs text-gray-500">
+                                                <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
                                                     PNG, JPG, GIF up to 10MB
                                                 </p>
                                                 {formData.paymentProof && (

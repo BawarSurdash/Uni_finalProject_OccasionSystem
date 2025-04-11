@@ -15,9 +15,11 @@ import OrderForm from './Components/orderform'
 import BookingSuccess from './Components/BookingSuccess'
 import BookingDetail from './Components/BookingDetail'
 import Dashboard from './Components/admin/Dashboard'
+import ThemeProvider from './contexts/ThemeContext'
+
 function App() {
   return (
-    <>
+    <ThemeProvider>
       <BrowserRouter>
         <Routes>
           <Route path='/' element={<Home />} />
@@ -37,7 +39,7 @@ function App() {
             <Route path="/booking/:id" element={<BookingDetail />} />
         </Routes>
       </BrowserRouter>
-    </>
+    </ThemeProvider>
   )
 }
 

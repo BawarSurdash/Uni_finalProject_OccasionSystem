@@ -6,7 +6,9 @@ import {
     HistoryOutlined,
     BellOutlined,
     UserOutlined,
-    SettingOutlined
+    SettingOutlined,
+    CommentOutlined,
+    StarOutlined
 } from '@ant-design/icons';
 import { Layout, Menu, theme } from 'antd';
 import { useNavigate } from 'react-router-dom';
@@ -15,6 +17,7 @@ import Setting from './setting';
 import Profile from './profile';
 import OrderHistory from './orderhistory';
 import AdminNotifications from './notification';
+import Feedback from './feedback';
 const { Header, Content, Footer, Sider } = Layout;
 
 const Dashboard = () => {
@@ -87,6 +90,12 @@ const Dashboard = () => {
             key: 'notifications',
             icon: <BellOutlined />,
             label: 'Notifications',
+            className: 'text-white'
+        },
+        {
+            key: 'feedback',
+            icon: <CommentOutlined />,
+            label: 'Feedback',
             className: 'text-white'
         },
         {
@@ -1660,6 +1669,10 @@ const Dashboard = () => {
 
                         {activeTab === 'orderHistory' && (
                             <OrderHistory active={true} darkMode={darkMode} />
+                        )}
+
+                        {activeTab === 'feedback' && (
+                            <Feedback darkMode={darkMode} />
                         )}
 
                         {activeTab === 'notifications' && (

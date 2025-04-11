@@ -54,6 +54,12 @@ const BookingDetail = () => {
       if (response.data.success) {
         setBooking({ ...booking, status: 'cancelled' });
         alert('Booking cancelled successfully');
+        navigate('/booking-success', {
+          state: {
+            postId: booking.Post.id,
+            bookingData: booking
+          }
+        });
       }
     } catch (error) {
       console.error('Error cancelling booking:', error);
