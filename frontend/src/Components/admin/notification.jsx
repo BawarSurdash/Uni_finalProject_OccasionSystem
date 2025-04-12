@@ -37,7 +37,7 @@ const AdminNotifications = ({ darkMode }) => {
                     title={
                         <div className="flex items-center">
                             <BellOutlined className="mr-2 text-xl" />
-                            <span className={`text-xl font-semibold ${darkMode ? 'text-black' : 'text-gray-800'}`}>
+                            <span className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-800'}`}>
                                 Create New Notification
                             </span>
                         </div>
@@ -60,8 +60,9 @@ const AdminNotifications = ({ darkMode }) => {
                         >
                             <Input 
                                 placeholder="Important Update"
-                                className={darkMode ? 'bg-gray-600 border-gray-500 text-white' : ''}
+                                className={darkMode ? 'bg-gray-600 border-gray-500 text-white placeholder-gray-400' : ''}
                                 maxLength={100}
+                                style={darkMode ? { backgroundColor: '#374151', borderColor: '#4B5563', color: 'white' } : {}}
                             />
                         </Form.Item>
 
@@ -76,9 +77,10 @@ const AdminNotifications = ({ darkMode }) => {
                             <Input.TextArea
                                 rows={5}
                                 placeholder="Write your notification message here..."
-                                className={darkMode ? 'bg-gray-600 border-gray-500 text-white' : ''}
+                                className={darkMode ? 'bg-gray-600 border-gray-500 text-white placeholder-gray-400' : ''}
                                 maxLength={500}
                                 showCount
+                                style={darkMode ? { backgroundColor: '#374151', borderColor: '#4B5563', color: 'white' } : {}}
                             />
                         </Form.Item>
 
@@ -107,6 +109,99 @@ const AdminNotifications = ({ darkMode }) => {
                     </div>
                 </Card>
             </div>
+            
+            {/* Add dark mode styling for Ant Design components */}
+            {darkMode && (
+                <style jsx="true">{`
+                    /* Card dark mode styling */
+                    .ant-card {
+                        background-color: #1f2937 !important;
+                        border-color: #374151 !important;
+                    }
+                    
+                    .ant-card-head {
+                        background-color: #1f2937 !important;
+                        border-bottom-color: #374151 !important;
+                        color: #e5e7eb !important;
+                    }
+                    
+                    .ant-card-head-title,
+                    .ant-card-meta-title {
+                        color: #e5e7eb !important;
+                    }
+                    
+                    .ant-card-body {
+                        background-color: #1f2937 !important;
+                        color: #e5e7eb !important;
+                    }
+                    
+                    /* Form styling */
+                    .ant-form-item-label > label {
+                        color: #e5e7eb !important;
+                    }
+                    
+                    .ant-form-item-explain-error {
+                        color: #ef4444 !important;
+                    }
+                    
+                    /* Input count styling */
+                    .ant-input-textarea-show-count::after {
+                        color: #9ca3af !important;
+                    }
+                    
+                    /* Button styling */
+                    .ant-btn-primary {
+                        background-color: #2563eb !important;
+                        border-color: #3b82f6 !important;
+                    }
+                    
+                    .ant-btn-primary:hover {
+                        background-color: #1d4ed8 !important;
+                        border-color: #2563eb !important;
+                    }
+                    
+                    /* Message notification styling */
+                    .ant-message-notice-content {
+                        background-color: #1f2937 !important;
+                        box-shadow: 0 3px 6px -4px rgba(0, 0, 0, 0.48) !important;
+                    }
+                    
+                    .ant-message-success .anticon,
+                    .ant-message-success .ant-message-custom-content {
+                        color: #10b981 !important;
+                    }
+                    
+                    .ant-message-error .anticon,
+                    .ant-message-error .ant-message-custom-content {
+                        color: #ef4444 !important;
+                    }
+                    
+                    /* Input field styling */
+                    .ant-input {
+                        background-color: #374151 !important;
+                        border-color: #4B5563 !important;
+                        color: white !important;
+                    }
+                    
+                    .ant-input::placeholder {
+                        color: #9CA3AF !important;
+                    }
+                    
+                    .ant-input:hover, .ant-input:focus {
+                        border-color: #3B82F6 !important;
+                    }
+                    
+                    .ant-input-textarea {
+                        background-color: #374151 !important;
+                    }
+                    
+                    .ant-input-textarea textarea {
+                        background-color: #374151 !important;
+                        border-color: #4B5563 !important;
+                        color: white !important;
+                    }
+                `}</style>
+            )}
         </div>
     );
 };

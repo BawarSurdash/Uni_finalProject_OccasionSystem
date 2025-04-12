@@ -566,6 +566,43 @@ const Feedback = ({ darkMode }) => {
                     .site-badge-count-dark .ant-badge-count {
                         box-shadow: 0 0 0 1px #1f2937 !important;
                     }
+                    
+                    /* Card dark mode styling */
+                    .ant-card {
+                        background-color: #1f2937 !important;
+                        border-color: #374151 !important;
+                    }
+                    
+                    .ant-card-head {
+                        background-color: #1f2937 !important;
+                        border-bottom-color: #374151 !important;
+                        color: #e5e7eb !important;
+                    }
+                    
+                    .ant-card-head-title,
+                    .ant-card-meta-title {
+                        color: #e5e7eb !important;
+                    }
+                    
+                    .ant-card-body {
+                        background-color: #1f2937 !important;
+                        color: #e5e7eb !important;
+                    }
+                    
+                    .ant-card-actions {
+                        background-color: #111827 !important;
+                        border-top-color: #374151 !important;
+                    }
+                    
+                    .ant-card-actions > li {
+                        border-right-color: #374151 !important;
+                    }
+                    
+                    .ant-tag-blue {
+                        background: #1d4ed8 !important;
+                        border-color: #2563eb !important;
+                        color: white !important;
+                    }
                 `}</style>
             )}
         </div>

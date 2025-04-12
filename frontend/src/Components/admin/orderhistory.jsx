@@ -134,7 +134,26 @@ const OrderHistory = ({ active, darkMode }) => {
             </div>
 
             {/* Booking Statistics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-4 mb-6">
+                <div 
+                    className={`${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-blue-50 border-blue-100'} p-4 rounded-lg border cursor-pointer`}
+                    onClick={() => setSelectedOrderStatus('All')}
+                >
+                    <div className="flex justify-between items-center">
+                        <div className="flex flex-col">
+                            <span className={`${darkMode ? 'text-blue-400' : 'text-blue-800'} text-sm font-medium`}>Total Orders</span>
+                            <span className={`text-2xl font-bold ${darkMode ? 'text-blue-300' : 'text-blue-600'}`}>
+                                {orderHistory.filter(order => order.status === 'completed' || order.status === 'cancelled').length}
+                            </span>
+                        </div>
+                        <div className="bg-blue-500 rounded-full w-10 h-10 flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
                 <div 
                     className={`${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-green-50 border-green-100'} p-4 rounded-lg border cursor-pointer`}
                     onClick={() => setSelectedOrderStatus('completed')}
@@ -335,7 +354,7 @@ const OrderHistory = ({ active, darkMode }) => {
                     <p className={`mt-2 ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>Loading order history...</p>
                 </div>
             ) : filteredOrderHistory.length > 0 ? (
-                <div className="overflow-x-auto">
+                <div className={`overflow-x-auto ${darkMode ? 'dark-table' : ''}`}>
                     {/* Result count indicator */}
                     <div className={`${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'} p-3 rounded-t-lg border border-b-0`}>
                         <div className="flex justify-between items-center">
@@ -485,6 +504,115 @@ const OrderHistory = ({ active, darkMode }) => {
                 <div className="text-center py-8">
                     <p className={`${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>No order history available.</p>
                 </div>
+            )}
+            
+            {/* Add dark mode styling */}
+            {darkMode && (
+                <style jsx="true">{`
+                    /* Header styles for dark mode */
+                    .dark-table .ant-table-thead > tr > th {
+                        background-color: #1f2937 !important;
+                        color: #e5e7eb !important;
+                        border-bottom: 1px solid #374151 !important;
+                    }
+                    
+                    /* Body styles for dark mode */
+                    .dark-table .ant-table-tbody > tr > td {
+                        background-color: #1f2937 !important;
+                        color: #e5e7eb !important;
+                        border-bottom: 1px solid #374151 !important;
+                    }
+                    
+                    /* Hover styles */
+                    .dark-table .ant-table-tbody > tr.ant-table-row:hover > td {
+                        background-color: #374151 !important;
+                    }
+                    
+                    /* Pagination styles */
+                    .dark-table .ant-pagination .ant-pagination-item-active {
+                        background-color: #3b82f6 !important;
+                        border-color: #3b82f6 !important;
+                    }
+                    
+                    .dark-table .ant-pagination .ant-pagination-item-active a {
+                        color: white !important;
+                    }
+                    
+                    .dark-table .ant-pagination .ant-pagination-item a,
+                    .dark-table .ant-pagination .ant-pagination-prev button,
+                    .dark-table .ant-pagination .ant-pagination-next button {
+                        color: #e5e7eb !important;
+                    }
+                    
+                    /* Empty data styling */
+                    .dark-table .ant-empty-description {
+                        color: #9ca3af !important;
+                    }
+                    
+                    .dark-table .ant-empty-img-simple-ellipse {
+                        fill: #4b5563 !important;
+                    }
+                    
+                    .dark-table .ant-empty-img-simple-g {
+                        stroke: #6b7280 !important;
+                    }
+                    
+                    .dark-table .ant-empty-img-simple-path {
+                        fill: #374151 !important;
+                    }
+                    
+                    /* Modal dark mode styling */
+                    .dark-modal .ant-modal-content {
+                        background-color: #1f2937 !important;
+                        color: #e5e7eb !important;
+                    }
+                    
+                    .dark-modal .ant-modal-header {
+                        background-color: #1f2937 !important;
+                        border-bottom: 1px solid #374151 !important;
+                    }
+                    
+                    .dark-modal .ant-modal-title {
+                        color: #e5e7eb !important;
+                    }
+                    
+                    .dark-modal .ant-modal-close {
+                        color: #e5e7eb !important;
+                    }
+                    
+                    .dark-modal .ant-modal-footer {
+                        border-top: 1px solid #374151 !important;
+                    }
+                    
+                    /* Select dropdown dark mode */
+                    .ant-dropdown-dark {
+                        background-color: #1f2937 !important;
+                        border: 1px solid #374151 !important;
+                        box-shadow: 0 3px 6px -4px rgba(0,0,0,0.48) !important;
+                    }
+                    
+                    .ant-dropdown-dark .ant-select-item {
+                        color: #e5e7eb !important;
+                    }
+                    
+                    .ant-dropdown-dark .ant-select-item-option-selected {
+                        background-color: #374151 !important;
+                    }
+                    
+                    .ant-dropdown-dark .ant-select-item-option-active:not(.ant-select-item-option-disabled) {
+                        background-color: #4b5563 !important;
+                    }
+                    
+                    .ant-select-dark .ant-select-selector {
+                        background-color: #1f2937 !important;
+                        border-color: #374151 !important;
+                        color: #e5e7eb !important;
+                    }
+                    
+                    .site-badge-count-dark .ant-badge-count {
+                        box-shadow: 0 0 0 1px #1f2937 !important;
+                    }
+                `}</style>
             )}
         </div>
     );

@@ -1208,7 +1208,7 @@ const Dashboard = () => {
                                 </div>
 
                                 {/* Booking Statistics */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                                     <div 
                                         className={`${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-blue-50 border-blue-100'} p-4 rounded-lg border cursor-pointer`}
                                         onClick={() => setSelectedBookingStatus('All')}
@@ -1216,7 +1216,7 @@ const Dashboard = () => {
                                         <div className="flex justify-between items-center">
                                             <div className="flex flex-col">
                                                 <span className={`${darkMode ? 'text-blue-300' : 'text-blue-800'} text-sm font-medium`}>Total</span>
-                                                <span className={`text-2xl font-bold ${darkMode ? 'text-blue-200' : 'text-blue-600'}`}>{stats.totalOrders}</span>
+                                                <span className={`text-2xl font-bold ${darkMode ? 'text-blue-200' : 'text-blue-600'}`}>{stats.pendingOrders + stats.confirmedOrders}</span>
                                             </div>
                                             <div className="bg-blue-500 rounded-full w-10 h-10 flex items-center justify-center">
                                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1259,47 +1259,13 @@ const Dashboard = () => {
                                             </div>
                                         </div>
                                     </div>
-
-                                    <div 
-                                        className={`${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-green-50 border-green-100'} p-4 rounded-lg border cursor-pointer`}
-                                        onClick={() => setSelectedBookingStatus('completed')}
-                                    >
-                                        <div className="flex justify-between items-center">
-                                            <div className="flex flex-col">
-                                                <span className={`${darkMode ? 'text-green-300' : 'text-green-800'} text-sm font-medium`}>Completed</span>
-                                                <span className={`text-2xl font-bold ${darkMode ? 'text-green-200' : 'text-green-600'}`}>{stats.completedOrders}</span>
-                                            </div>
-                                            <div className="bg-green-500 rounded-full w-10 h-10 flex items-center justify-center">
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                </svg>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div 
-                                        className={`${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-red-50 border-red-100'} p-4 rounded-lg border cursor-pointer`}
-                                        onClick={() => setSelectedBookingStatus('cancelled')}
-                                    >
-                                        <div className="flex justify-between items-center">
-                                            <div className="flex flex-col">
-                                                <span className={`${darkMode ? 'text-red-300' : 'text-red-800'} text-sm font-medium`}>Cancelled</span>
-                                                <span className={`text-2xl font-bold ${darkMode ? 'text-red-200' : 'text-red-600'}`}>{stats.cancelledOrders}</span>
-                                            </div>
-                                            <div className="bg-red-500 rounded-full w-10 h-10 flex items-center justify-center">
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                </svg>
-                                            </div>
-                                        </div>
-                                    </div>
                                 </div>
 
                                 {/* Status Filter */}
                                 <div className={`mb-6 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} p-4 rounded-lg`}>
                                     <label className={`block text-sm font-medium ${darkMode ? 'text-gray-200' : 'text-gray-700'} mb-3`}>Filter by Status</label>
                                     <div className="flex flex-wrap gap-2">
-                                        {['All', 'Pending', 'Confirmed', 'Completed', 'Cancelled'].map((status) => (
+                                        {['All', 'Pending', 'Confirmed'].map((status) => (
                                             <button
                                                 key={status}
                                                 onClick={() => setSelectedBookingStatus(status === 'All' ? 'All' : status.toLowerCase())}
@@ -1307,8 +1273,6 @@ const Dashboard = () => {
                                                     selectedBookingStatus === (status === 'All' ? 'All' : status.toLowerCase())
                                                         ? status === 'Pending' ? 'bg-yellow-500 text-white shadow-md' :
                                                           status === 'Confirmed' ? 'bg-blue-500 text-white shadow-md' :
-                                                          status === 'Completed' ? 'bg-green-500 text-white shadow-md' :
-                                                          status === 'Cancelled' ? 'bg-red-500 text-white shadow-md' :
                                                           'bg-blue-500 text-white shadow-md'
                                                         : darkMode 
                                                           ? 'bg-gray-600 text-gray-200 hover:bg-gray-500 border border-gray-600' 
@@ -1446,10 +1410,14 @@ const Dashboard = () => {
                                                 <span className={`${darkMode ? 'text-gray-200' : 'text-gray-700'} font-medium`}>
                                                     {(() => {
                                                         const filteredBookings = bookings.filter(booking => 
+                                                            (booking.status === 'pending' || booking.status === 'confirmed') &&
                                                             (selectedBookingStatus === 'All' || booking.status === selectedBookingStatus) &&
                                                             (selectedPaymentMethod === 'All' || booking.paymentMethod === selectedPaymentMethod)
                                                         );
-                                                        return `Showing ${filteredBookings.length} of ${bookings.length} bookings`;
+                                                        const activeBookings = bookings.filter(booking => 
+                                                            booking.status === 'pending' || booking.status === 'confirmed'
+                                                        );
+                                                        return `Showing ${filteredBookings.length} of ${activeBookings.length} active bookings`;
                                                     })()}
                                                 </span>
                                                 <div className="flex space-x-2">
@@ -1532,6 +1500,11 @@ const Dashboard = () => {
                                             <tbody>
                                                 {(() => {
                                                     // Calculate pagination for filtered bookings
+                                                    const filteredBookings = bookings.filter(booking => 
+                                                        (booking.status === 'pending' || booking.status === 'confirmed') &&
+                                                        (selectedBookingStatus === 'All' || booking.status === selectedBookingStatus) &&
+                                                        (selectedPaymentMethod === 'All' || booking.paymentMethod === selectedPaymentMethod)
+                                                    );
                                                     const indexOfLastBooking = currentPage * bookingsPerPage;
                                                     const indexOfFirstBooking = indexOfLastBooking - bookingsPerPage;
                                                     const currentBookings = filteredBookings.slice(indexOfFirstBooking, indexOfLastBooking);
@@ -1611,8 +1584,6 @@ const Dashboard = () => {
                                                                             <option value="" disabled>Change Status</option>
                                                                             {booking.status !== 'pending' && <option value="pending">Pending</option>}
                                                                             {booking.status !== 'confirmed' && <option value="confirmed">Confirmed</option>}
-                                                                            {booking.status !== 'completed' && <option value="completed">Complete</option>}
-                                                                            {booking.status !== 'cancelled' && <option value="cancelled">Cancelled</option>}
                                                                         </select>
                                                                     </div>
                                                                 </div>
@@ -1627,35 +1598,51 @@ const Dashboard = () => {
                                         <div className={`mt-4 flex justify-between items-center p-4 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'} rounded-b-lg border border-t-0`}>
                                             <div>
                                                 <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                                                    Page {currentPage} of {Math.ceil(filteredBookings.length / bookingsPerPage)}
+                                                    Page {currentPage} of {Math.ceil(bookings.filter(booking => 
+                                                        (booking.status === 'pending' || booking.status === 'confirmed') &&
+                                                        (selectedBookingStatus === 'All' || booking.status === selectedBookingStatus) &&
+                                                        (selectedPaymentMethod === 'All' || booking.paymentMethod === selectedPaymentMethod)
+                                                    ).length / bookingsPerPage)}
                                                 </span>
                                             </div>
                                             <div className="flex space-x-2">
                                                 <button
                                                     onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                                            disabled={currentPage === 1}
+                                                    disabled={currentPage === 1}
                                                     className={`px-4 py-2 rounded-md ${
-                                                currentPage === 1
+                                                        currentPage === 1
                                                         ? 'bg-gray-200 text-gray-500 cursor-not-allowed' 
                                                         : 'bg-blue-500 text-white hover:bg-blue-600'
-                                            }`}
-                                        >
-                                            Previous
-                                        </button>
-                                        <button 
+                                                    }`}
+                                                >
+                                                    Previous
+                                                </button>
+                                                <button 
                                                     onClick={() => {
-                                                        const totalPages = Math.ceil(filteredBookings.length / bookingsPerPage);
+                                                        const totalPages = Math.ceil(bookings.filter(booking => 
+                                                            (booking.status === 'pending' || booking.status === 'confirmed') &&
+                                                            (selectedBookingStatus === 'All' || booking.status === selectedBookingStatus) &&
+                                                            (selectedPaymentMethod === 'All' || booking.paymentMethod === selectedPaymentMethod)
+                                                        ).length / bookingsPerPage);
                                                         setCurrentPage(prev => Math.min(totalPages, prev + 1));
                                                     }}
-                                                    disabled={currentPage >= Math.ceil(filteredBookings.length / bookingsPerPage)}
+                                                    disabled={currentPage >= Math.ceil(bookings.filter(booking => 
+                                                        (booking.status === 'pending' || booking.status === 'confirmed') &&
+                                                        (selectedBookingStatus === 'All' || booking.status === selectedBookingStatus) &&
+                                                        (selectedPaymentMethod === 'All' || booking.paymentMethod === selectedPaymentMethod)
+                                                    ).length / bookingsPerPage)}
                                                     className={`px-4 py-2 rounded-md ${
-                                                        currentPage >= Math.ceil(filteredBookings.length / bookingsPerPage)
+                                                        currentPage >= Math.ceil(bookings.filter(booking => 
+                                                            (booking.status === 'pending' || booking.status === 'confirmed') &&
+                                                            (selectedBookingStatus === 'All' || booking.status === selectedBookingStatus) &&
+                                                            (selectedPaymentMethod === 'All' || booking.paymentMethod === selectedPaymentMethod)
+                                                        ).length / bookingsPerPage)
                                                         ? 'bg-gray-200 text-gray-500 cursor-not-allowed' 
                                                         : 'bg-blue-500 text-white hover:bg-blue-600'
-                                            }`}
-                                        >
-                                            Next
-                                        </button>
+                                                    }`}
+                                                >
+                                                    Next
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -1865,7 +1852,7 @@ const Dashboard = () => {
                     </div>
                 </Content>
                 <Footer style={{ textAlign: 'center' }}>
-                    Occasions System ©{new Date().getFullYear()} Created with ❤️
+                    Occasions System ©{new Date().getFullYear()} Created by Olivia and Bawar
                 </Footer>
             </Layout>
         </Layout>
