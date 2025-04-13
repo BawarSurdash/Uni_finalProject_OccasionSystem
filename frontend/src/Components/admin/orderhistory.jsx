@@ -12,6 +12,8 @@ const OrderHistory = ({ active, darkMode }) => {
     const [endDate, setEndDate] = useState('');
     const [currentOrderPage, setCurrentOrderPage] = useState(1);
     const [ordersPerPage] = useState(10);
+    const [selectedBooking, setSelectedBooking] = useState(null);
+    const [isViewingBookingDetails, setIsViewingBookingDetails] = useState(false);
     
     useEffect(() => {
         if (active) {
@@ -45,7 +47,7 @@ const OrderHistory = ({ active, darkMode }) => {
     };
 
     const formatDate = (dateString) => {
-        const options = { year: 'numeric', month: 'short', day: 'numeric' };
+        const options = { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
         return new Date(dateString).toLocaleDateString(undefined, options);
     };
 
@@ -55,8 +57,8 @@ const OrderHistory = ({ active, darkMode }) => {
             const response = await axios.get(`http://localhost:3001/booking/admin/${bookingId}`, {
                 headers: { accessToken: token }
             });
-            // You could implement a modal to show details here, or redirect to a details page
-            alert(`Booking details for ID ${bookingId} fetched successfully. Implement modal or redirection as needed.`);
+            setSelectedBooking(response.data);
+            setIsViewingBookingDetails(true);
         } catch (error) {
             console.error('Error fetching booking details:', error);
             alert('Failed to fetch booking details');
@@ -452,7 +454,7 @@ const OrderHistory = ({ active, darkMode }) => {
                                         </td>
                                         <td className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600 text-gray-200' : 'border-gray-200'}`}>
                                             <button 
-                                                className="text-blue-500 hover:text-blue-700"
+                                                className={`${darkMode ? 'text-white hover:text-orange-300' : 'text-blue-500 hover:text-blue-700'}`}
                                                 onClick={() => viewBookingDetails(order.id)}
                                             >
                                                 View Details
@@ -503,6 +505,144 @@ const OrderHistory = ({ active, darkMode }) => {
             ) : (
                 <div className="text-center py-8">
                     <p className={`${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>No order history available.</p>
+                </div>
+            )}
+            
+            {/* Booking details modal */}
+            {isViewingBookingDetails && selectedBooking && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+                    <div className={`relative mx-auto p-5 w-11/12 md:w-3/4 lg:w-1/2 rounded-md shadow-lg ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                        <div className={`flex justify-between items-center ${darkMode ? 'border-gray-700' : 'border-gray-200'} border-b pb-3 mb-4`}>
+                            <h3 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                                Booking Details #{selectedBooking.id}
+                            </h3>
+                            <button 
+                                onClick={() => setIsViewingBookingDetails(false)}
+                                className={`${darkMode ? 'text-gray-300 hover:text-white' : 'text-gray-500 hover:text-gray-700'}`}
+                            >
+                                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <h4 className={`font-medium ${darkMode ? 'text-gray-200' : 'text-gray-800'} mb-3`}>Booking Information</h4>
+                                <div className="space-y-3 text-sm">
+                                    <div className="flex justify-between">
+                                        <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Booking Date:</span>
+                                        <span className={darkMode ? 'text-white' : ''}>{formatDate(selectedBooking.createdAt)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Event Date:</span>
+                                        <span className={darkMode ? 'text-white' : ''}>{formatDate(selectedBooking.eventDate)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Status:</span>
+                                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                            selectedBooking.status === 'completed' 
+                                            ? darkMode ? 'bg-green-900 text-green-200' : 'bg-green-500 text-white' 
+                                            : selectedBooking.status === 'confirmed' 
+                                            ? darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-500 text-white'
+                                            : selectedBooking.status === 'pending' 
+                                            ? darkMode ? 'bg-yellow-900 text-yellow-200' : 'bg-yellow-500 text-white'
+                                            : darkMode ? 'bg-red-900 text-red-200' : 'bg-red-500 text-white'
+                                        }`}>
+                                            {selectedBooking.status.charAt(0).toUpperCase() + selectedBooking.status.slice(1)}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Total Price:</span>
+                                        <span className={`font-medium ${darkMode ? 'text-white' : ''}`}>${parseFloat(selectedBooking.totalPrice).toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Payment Method:</span>
+                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                            selectedBooking.paymentMethod === 'fib' 
+                                            ? darkMode ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-800' 
+                                            : selectedBooking.paymentMethod === 'fastpay' 
+                                            ? darkMode ? 'bg-pink-900 text-pink-200' : 'bg-pink-100 text-pink-800'
+                                            : selectedBooking.paymentMethod === 'cash' 
+                                            ? darkMode ? 'bg-yellow-900 text-yellow-200' : 'bg-yellow-100 text-yellow-800'
+                                            : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-800'
+                                        }`}>
+                                            {selectedBooking.paymentMethod === 'fib' ? 'FIB Bank' :
+                                            selectedBooking.paymentMethod === 'fastpay' ? 'FastPay' :
+                                            selectedBooking.paymentMethod === 'cash' ? 'Cash' :
+                                            selectedBooking.paymentMethod}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <h4 className={`font-medium ${darkMode ? 'text-gray-200' : 'text-gray-800'} mb-3`}>Contact Information</h4>
+                                <div className="space-y-3 text-sm">
+                                    {selectedBooking.User && (
+                                    <div>
+                                        <div className="flex justify-between">
+                                            <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Username:</span>
+                                            <span className={darkMode ? 'text-white' : ''}>{selectedBooking.User.username}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Email:</span>
+                                            <span className={darkMode ? 'text-white' : ''}>{selectedBooking.User.email}</span>
+                                        </div>
+                                    </div>
+                                    )}
+                                    <div className="flex justify-between">
+                                        <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Phone:</span>
+                                        <span className={darkMode ? 'text-white' : ''}>{selectedBooking.phoneNumber}</span>
+                                    </div>
+                                    <div>
+                                        <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} block mb-1`}>Address:</span>
+                                        <span className={`block text-right ${darkMode ? 'text-white' : ''}`}>{selectedBooking.address}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {selectedBooking.Post && (
+                            <div className={`mt-6 ${darkMode ? 'border-gray-700' : 'border-gray-200'} border-t pt-4`}>
+                                <h4 className={`font-medium ${darkMode ? 'text-gray-200' : 'text-gray-800'} mb-3`}>Service Details</h4>
+                                <div className="flex flex-col md:flex-row">
+                                    {selectedBooking.Post.image && (
+                                        <div className="md:w-1/3 mb-4 md:mb-0 md:mr-4">
+                                            <img 
+                                                src={selectedBooking.Post.image} 
+                                                alt={selectedBooking.Post.title} 
+                                                className="w-full h-32 object-cover rounded-lg"
+                                            />
+                                        </div>
+                                    )}
+                                    <div className="md:w-2/3">
+                                        <h5 className={`text-lg font-medium ${darkMode ? 'text-white' : ''}`}>{selectedBooking.Post.title}</h5>
+                                        <span className={`inline-block ${
+                                            darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'
+                                        } text-xs px-2 py-1 rounded-full mb-2`}>
+                                            {selectedBooking.Post.category}
+                                        </span>
+                                        <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{selectedBooking.Post.description}</p>
+                                        <p className={`text-sm font-medium ${darkMode ? 'text-gray-200' : 'text-gray-700'} mt-2`}>
+                                            Base Price: ${parseFloat(selectedBooking.Post.basePrice).toFixed(2)}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        
+                        <div className="mt-6 flex justify-center">
+                            <button
+                                onClick={() => setIsViewingBookingDetails(false)}
+                                className={`px-4 py-2 rounded-md ${
+                                    darkMode ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                }`}
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
             

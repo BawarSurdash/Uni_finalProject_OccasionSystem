@@ -36,7 +36,7 @@ function AppRoutes() {
       <Route path="/servicesdetail/:id" element={<ServicesDetail />} />
       <Route path="/book/:id" element={<OrderForm />} />
       <Route path="/success" element={<BookingSuccess />} />
-      <Route path="/booking/:id" element={<BookingDetail />} />
+      <Route path="/booking/:id" element={<BookingDetail darkMode={darkMode} />} />
     </Routes>
   );
 }

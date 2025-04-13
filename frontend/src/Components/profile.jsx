@@ -105,9 +105,20 @@ const Profile = () => {
   const bookingsPerPage = 10;
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [bookingToCancel, setBookingToCancel] = useState(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [cancelledBookingId, setCancelledBookingId] = useState(null);
   
   // Use the global theme context instead of local state
   const { darkMode, toggleDarkMode } = useTheme();
+
+  // Check for URL parameters to set the active tab
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const tabParam = searchParams.get('tab');
+    if (tabParam && tabs.some(tab => tab.id === tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, []);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -183,7 +194,9 @@ const Profile = () => {
         setUserBookings(userBookings.map(booking => 
           booking.id === bookingToCancel ? { ...booking, status: 'cancelled' } : booking
         ));
-        alert('Booking cancelled successfully');
+        setCancelledBookingId(bookingToCancel);
+        setShowCancelModal(false);
+        setShowSuccessModal(true);
       }
     } catch (error) {
       console.error('Error cancelling booking:', error);
@@ -282,6 +295,31 @@ const Profile = () => {
                   className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors duration-200"
                 >
                   Yes, Cancel Booking
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Success Modal */}
+        {showSuccessModal && (
+          <div className="fixed inset-0 backdrop-blur bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'} p-6 rounded-lg shadow-xl max-w-md w-full transition-colors duration-200`}>
+              <div className="text-center">
+                <div className={`mx-auto flex items-center justify-center h-12 w-12 rounded-full ${darkMode ? 'bg-green-900' : 'bg-green-100'} mb-4`}>
+                  <svg className={`h-6 w-6 ${darkMode ? 'text-green-300' : 'text-green-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold mb-2">Booking Cancelled Successfully</h3>
+                <p className={`mb-6 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                  Your booking #{cancelledBookingId} has been cancelled.
+                </p>
+                <button
+                  onClick={() => setShowSuccessModal(false)}
+                  className={`w-full px-4 py-2 ${darkMode ? 'bg-orange-500 hover:bg-orange-600' : 'bg-orange-600 hover:bg-orange-700'} text-white rounded-lg transition-colors duration-200`}
+                >
+                  Got it
                 </button>
               </div>
             </div>
@@ -827,6 +865,84 @@ const NotificationsPanel = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const { darkMode } = useTheme();
+  const [currentPage, setCurrentPage] = useState(1);
+  const notificationsPerPage = 10;
+  const navigate = useNavigate();
+
+  // Function to handle notification clicks
+  const handleNotificationClick = (notification) => {
+    // Mark as read first
+    markAsRead(notification.id);
+    
+    // Check notification type or content to determine navigation
+    if (notification.title.includes("New Event") || notification.content.includes("new event")) {
+      // Extract event name from the content using regex
+      const eventNameMatch = notification.content.match(/"([^"]+)"/);
+      const eventName = eventNameMatch ? eventNameMatch[1] : null;
+      
+      if (eventName) {
+        // Navigate to the events page with a search parameter for the specific event
+        navigate(`/events?search=${encodeURIComponent(eventName)}`);
+      } else {
+        // If can't extract name, just go to events page
+        navigate('/events');
+      }
+    } else if (notification.title.includes("Booking Status") || notification.content.includes("booking")) {
+      // Try to get bookingId from notification if it exists as a property
+      if (notification.bookingId) {
+        navigate(`/booking/${notification.bookingId}`);
+        return;
+      }
+      
+      // Try to extract booking ID from content using regex patterns
+      const bookingIdPattern1 = notification.content.match(/#(\d+)/);
+      const bookingIdPattern2 = notification.content.match(/booking\s+(?:id|ID|Id)?\s*[:# ]?\s*(\d+)/i);
+      const bookingIdPattern3 = notification.content.match(/booking\s+(?:number|#)?\s*(\d+)/i);
+      
+      // Use the first pattern that matches
+      const bookingId = bookingIdPattern1 ? bookingIdPattern1[1] : 
+                        bookingIdPattern2 ? bookingIdPattern2[1] :
+                        bookingIdPattern3 ? bookingIdPattern3[1] : null;
+      
+      if (bookingId) {
+        // Navigate to specific booking
+        navigate(`/booking/${bookingId}`);
+      } else {
+        // No ID found in notification, fetch most recent booking
+        fetchMostRecentBooking();
+      }
+    } else {
+      // Default action for other notifications
+      console.log("Notification clicked:", notification);
+    }
+  };
+
+  // Function to fetch most recent booking when booking ID isn't available
+  const fetchMostRecentBooking = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('http://localhost:3001/booking/', {
+        headers: { accessToken: token }
+      });
+      
+      // Sort bookings by date (newest first)
+      const sortedBookings = response.data.sort((a, b) => 
+        new Date(b.createdAt) - new Date(a.createdAt)
+      );
+      
+      if (sortedBookings.length > 0) {
+        // Navigate to the most recent booking
+        navigate(`/booking/${sortedBookings[0].id}`);
+      } else {
+        // If no bookings found, go to orders tab
+        navigate('/profile?tab=orders');
+      }
+    } catch (error) {
+      console.error('Error fetching recent booking:', error);
+      // Fallback to orders tab
+      navigate('/profile?tab=orders');
+    }
+  };
 
   const fetchNotifications = async () => {
     setIsLoading(true);
@@ -890,6 +1006,12 @@ const NotificationsPanel = () => {
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
 
+  // Calculate pagination
+  const indexOfLastNotification = currentPage * notificationsPerPage;
+  const indexOfFirstNotification = indexOfLastNotification - notificationsPerPage;
+  const currentNotifications = notifications.slice(indexOfFirstNotification, indexOfLastNotification);
+  const totalPages = Math.ceil(notifications.length / notificationsPerPage);
+
   if (isLoading) {
     return (
       <div className="text-center py-8">
@@ -934,51 +1056,133 @@ const NotificationsPanel = () => {
           <p>No notifications yet</p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {notifications.map(notification => (
-            <div 
-              key={notification.id} 
-              className={`p-4 rounded-lg transition-all duration-200 ${
-                notification.read 
-                  ? darkMode 
-                    ? 'bg-gray-800 border border-gray-700' 
-                    : 'bg-gray-50 border border-gray-200' 
-                  : darkMode
-                    ? 'bg-gray-800 border-l-4 border-l-orange-500 border-t border-r border-b border-gray-700 shadow-sm'
-                    : 'bg-white border-l-4 border-l-orange-500 border-t border-r border-b border-gray-200 shadow-sm'
-              }`}
-            >
-              <div className="flex justify-between items-start">
-                <h3 className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-800'}`}>
-                  {notification.title}
-                </h3>
-                <div className="flex items-center space-x-2">
-                  <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                    {formatDate(notification.createdAt)}
-                  </span>
-                  {!notification.read && (
-                    <button
-                      onClick={() => markAsRead(notification.id)}
-                      className={`px-2 py-1 text-xs ${
-                        darkMode 
-                          ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                      } rounded`}
-                    >
-                      Mark as Read
-                    </button>
-                  )}
+        <>
+          <div className="space-y-4">
+            {currentNotifications.map(notification => (
+              <div 
+                key={notification.id} 
+                className={`p-4 rounded-lg transition-all duration-200 ${
+                  notification.read 
+                    ? darkMode 
+                      ? 'bg-gray-800 border border-gray-700' 
+                      : 'bg-gray-50 border border-gray-200' 
+                    : darkMode
+                      ? 'bg-gray-800 border-l-4 border-l-orange-500 border-t border-r border-b border-gray-700 shadow-sm'
+                      : 'bg-white border-l-4 border-l-orange-500 border-t border-r border-b border-gray-200 shadow-sm'
+                } ${
+                  isNotificationClickable(notification) 
+                    ? 'cursor-pointer hover:shadow-md transition-shadow' 
+                    : ''
+                }`}
+                onClick={() => isNotificationClickable(notification) && handleNotificationClick(notification)}
+              >
+                <div className="flex justify-between items-start">
+                  <h3 className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-800'}`}>
+                    {notification.title}
+                    {isNotificationClickable(notification) && (
+                      <span className="ml-2 text-xs py-1 px-2 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded-full font-medium">Click to view</span>
+                    )}
+                  </h3>
+                  <div className="flex items-center space-x-2">
+                    <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      {formatDate(notification.createdAt)}
+                    </span>
+                    {!notification.read && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation(); // Prevent triggering parent div click
+                          markAsRead(notification.id);
+                        }}
+                        className={`px-2 py-1 text-xs ${
+                          darkMode 
+                            ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        } rounded`}
+                      >
+                        Mark as Read
+                      </button>
+                    )}
+                  </div>
                 </div>
+                <p className={`mt-2 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                  {notification.content}
+                </p>
               </div>
-              <p className={`mt-2 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                {notification.content}
-              </p>
+            ))}
+          </div>
+          
+          {/* Pagination controls */}
+          {notifications.length > notificationsPerPage && (
+            <div className="mt-6 flex justify-between items-center">
+              <div className={`${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                Showing {indexOfFirstNotification + 1}-{Math.min(indexOfLastNotification, notifications.length)} of {notifications.length} notifications
+              </div>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className={`px-4 py-2 rounded-md ${
+                    currentPage === 1 
+                      ? darkMode 
+                        ? 'bg-gray-700 text-gray-500 cursor-not-allowed' 
+                        : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                      : darkMode
+                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                        : 'bg-blue-500 text-white hover:bg-blue-600'
+                  }`}
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage >= totalPages}
+                  className={`px-4 py-2 rounded-md ${
+                    currentPage >= totalPages
+                      ? darkMode 
+                        ? 'bg-gray-700 text-gray-500 cursor-not-allowed' 
+                        : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                      : darkMode
+                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                        : 'bg-blue-500 text-white hover:bg-blue-600'
+                  }`}
+                >
+                  Next
+                </button>
+              </div>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
     </div>
   );
+  
+  // Helper function to determine if a notification is clickable
+  function isNotificationClickable(notification) {
+    // Check title first
+    const titleMatches = [
+      /booking/i, 
+      /order/i, 
+      /status/i, 
+      /event/i,
+      /new/i,
+      /confirm/i,
+      /complet/i,
+      /cancel/i
+    ].some(pattern => pattern.test(notification.title));
+    
+    // Check content if title doesn't match
+    const contentMatches = [
+      /booking/i,
+      /order/i,
+      /event/i,
+      /service/i,
+      /confirm/i,
+      /complet/i,
+      /cancel/i
+    ].some(pattern => pattern.test(notification.content));
+    
+    return titleMatches || contentMatches;
+  }
 };
 
 export default Profile;

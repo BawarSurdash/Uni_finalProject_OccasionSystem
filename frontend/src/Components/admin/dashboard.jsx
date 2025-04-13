@@ -482,6 +482,52 @@ const Dashboard = () => {
                 // Update statistics after status change
                 fetchStatistics();
                 
+                // Send notification to the user about status change
+                const booking = bookings.find(b => b.id === bookingId);
+                if (booking) {
+                    // Extract the userId - check various possible structures
+                    const userId = booking.userId || (booking.User && booking.User.id);
+                    
+                    if (userId) {
+                        // Prepare notification content with appropriate message for each status
+                        let statusMessage = '';
+                        if (status === 'confirmed') {
+                            statusMessage = 'Your booking has been confirmed. Get ready for your event!';
+                        } else if (status === 'completed') {
+                            statusMessage = 'Your booking has been marked as completed. Thank you for using our service!';
+                        } else if (status === 'cancelled') {
+                            statusMessage = 'Your booking has been cancelled. We\'re sorry for any inconvenience.';
+                        } else {
+                            statusMessage = `Your booking status has been updated to: ${status}`;
+                        }
+                        
+                        const notificationData = {
+                            userId: userId,
+                            title: "Booking Status Update",
+                            content: statusMessage,
+                            type: "booking_status",
+                            bookingId: bookingId
+                        };
+                        
+                        try {
+                            // Try both possible endpoints
+                            await axios.post('http://localhost:3001/notification/create', notificationData, {
+                                headers: { accessToken: token }
+                            }).catch(async () => {
+                                // If first endpoint fails, try alternative
+                                await axios.post('http://localhost:3001/notification', notificationData, {
+                                    headers: { accessToken: token }
+                                });
+                            });
+                            console.log("Notification sent successfully!");
+                        } catch (notifyError) {
+                            console.error("Failed to send notification:", notifyError);
+                        }
+                    } else {
+                        console.warn("Could not find user ID for booking:", booking);
+                    }
+                }
+                
                 alert(`Booking status updated to "${status}"`);
             }
         } catch (error) {
@@ -1215,7 +1261,7 @@ const Dashboard = () => {
                                     >
                                         <div className="flex justify-between items-center">
                                             <div className="flex flex-col">
-                                                <span className={`${darkMode ? 'text-blue-300' : 'text-blue-800'} text-sm font-medium`}>Total</span>
+                                                <span className={`${darkMode ? 'text-blue-300' : 'text-blue-800'} text-sm font-medium`}>Total Booking</span>
                                                 <span className={`text-2xl font-bold ${darkMode ? 'text-blue-200' : 'text-blue-600'}`}>{stats.pendingOrders + stats.confirmedOrders}</span>
                                             </div>
                                             <div className="bg-blue-500 rounded-full w-10 h-10 flex items-center justify-center">
@@ -1558,8 +1604,8 @@ const Dashboard = () => {
                                                             <td className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}>
                                                                 <div className="flex items-center space-x-2">
                                                                     <button 
-                                                                        className={`${darkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-500 hover:text-blue-700'}`}
                                                                         onClick={() => viewBookingDetails(booking.id)}
+                                                                        className="text-white bg-blue-500 hover:bg-blue-600 px-2 py-1 rounded"
                                                                     >
                                                                         View
                                                                     </button>
@@ -1584,6 +1630,8 @@ const Dashboard = () => {
                                                                             <option value="" disabled>Change Status</option>
                                                                             {booking.status !== 'pending' && <option value="pending">Pending</option>}
                                                                             {booking.status !== 'confirmed' && <option value="confirmed">Confirmed</option>}
+                                                                            {booking.status !== 'completed' && <option value="completed">Completed</option>}
+                                                                            {booking.status !== 'cancelled' && <option value="cancelled">Cancelled</option>}
                                                                         </select>
                                                                     </div>
                                                                 </div>
@@ -1680,14 +1728,14 @@ const Dashboard = () => {
                         {/* Booking Details Modal */}
                         {isViewingBookingDetails && selectedBooking && (
                             <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-                                <div className="relative mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
-                                    <div className="flex justify-between items-center border-b pb-3 mb-4">
-                                        <h3 className="text-xl font-semibold text-gray-900">
+                                <div className={`relative mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md ${darkMode ? 'bg-gray-800 text-white' : 'bg-white'}`}>
+                                    <div className={`flex justify-between items-center border-b pb-3 mb-4 ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                                        <h3 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                                             Booking Details #{selectedBooking.id}
                                         </h3>
                                         <button 
                                             onClick={() => setIsViewingBookingDetails(false)}
-                                            className="text-gray-400 hover:text-gray-500"
+                                            className={`${darkMode ? 'text-gray-300 hover:text-gray-100' : 'text-gray-400 hover:text-gray-500'}`}
                                         >
                                             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -1697,18 +1745,18 @@ const Dashboard = () => {
                                     
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div>
-                                            <h4 className="font-medium text-gray-800 mb-3">Booking Information</h4>
+                                            <h4 className={`font-medium ${darkMode ? 'text-gray-200' : 'text-gray-800'} mb-3`}>Booking Information</h4>
                                             <div className="space-y-3 text-sm">
                                                 <div className="flex justify-between">
-                                                    <span className="text-gray-500">Booking Date:</span>
+                                                    <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Booking Date:</span>
                                                     <span>{formatDate(selectedBooking.createdAt)}</span>
                                                 </div>
                                                 <div className="flex justify-between">
-                                                    <span className="text-gray-500">Event Date:</span>
+                                                    <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Event Date:</span>
                                                     <span>{formatDate(selectedBooking.eventDate)}</span>
                                                 </div>
                                                 <div className="flex justify-between">
-                                                    <span className="text-gray-500">Status:</span>
+                                                    <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Status:</span>
                                                     <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
                                                         selectedBooking.status === 'completed' ? 'bg-green-500 text-white' :
                                                         selectedBooking.status === 'confirmed' ? 'bg-blue-500 text-white' :
@@ -1720,11 +1768,11 @@ const Dashboard = () => {
                                                     </span>
                                                 </div>
                                                 <div className="flex justify-between">
-                                                    <span className="text-gray-500">Total Price:</span>
+                                                    <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Total Price:</span>
                                                     <span className="font-medium">${parseFloat(selectedBooking.totalPrice).toFixed(2)}</span>
                                                 </div>
                                                 <div className="flex justify-between">
-                                                    <span className="text-gray-500">Payment Method:</span>
+                                                    <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Payment Method:</span>
                                                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                                                         selectedBooking.paymentMethod === 'fib' ? 'bg-green-100 text-green-800' :
                                                         selectedBooking.paymentMethod === 'fastpay' ? 'bg-pink-100 text-pink-800' :
@@ -1741,26 +1789,26 @@ const Dashboard = () => {
                                         </div>
                                         
                                         <div>
-                                            <h4 className="font-medium text-gray-800 mb-3">Contact Information</h4>
+                                            <h4 className={`font-medium ${darkMode ? 'text-gray-200' : 'text-gray-800'} mb-3`}>Contact Information</h4>
                                             <div className="space-y-3 text-sm">
                                                 {selectedBooking.User && (
                                                 <div>
                                                     <div className="flex justify-between">
-                                                        <span className="text-gray-500">Username:</span>
+                                                        <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Username:</span>
                                                         <span>{selectedBooking.User.username}</span>
                                                     </div>
                                                     <div className="flex justify-between">
-                                                        <span className="text-gray-500">Email:</span>
+                                                        <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Email:</span>
                                                         <span>{selectedBooking.User.email}</span>
                                                     </div>
                                                 </div>
                                                 )}
                                                 <div className="flex justify-between">
-                                                    <span className="text-gray-500">Phone:</span>
+                                                    <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Phone:</span>
                                                     <span>{selectedBooking.phoneNumber}</span>
                                                 </div>
                                                 <div>
-                                                    <span className="text-gray-500 block mb-1">Address:</span>
+                                                    <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} block mb-1`}>Address:</span>
                                                     <span className="block text-right">{selectedBooking.address}</span>
                                                 </div>
                                             </div>
@@ -1768,8 +1816,8 @@ const Dashboard = () => {
                                     </div>
                                     
                                     {selectedBooking.Post && (
-                                        <div className="mt-6 border-t pt-4">
-                                            <h4 className="font-medium text-gray-800 mb-3">Service Details</h4>
+                                        <div className={`mt-6 border-t pt-4 ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                                            <h4 className={`font-medium ${darkMode ? 'text-gray-200' : 'text-gray-800'} mb-3`}>Service Details</h4>
                                             <div className="flex flex-col md:flex-row">
                                                 {selectedBooking.Post.image && (
                                                     <div className="md:w-1/3 mb-4 md:mb-0 md:mr-4">
@@ -1785,8 +1833,8 @@ const Dashboard = () => {
                                                     <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full mb-2">
                                                         {selectedBooking.Post.category}
                                                     </span>
-                                                    <p className="text-sm text-gray-600">{selectedBooking.Post.description}</p>
-                                                    <p className="text-sm font-medium text-gray-700 mt-2">
+                                                    <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{selectedBooking.Post.description}</p>
+                                                    <p className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mt-2`}>
                                                         Base Price: ${parseFloat(selectedBooking.Post.basePrice).toFixed(2)}
                                                     </p>
                                                 </div>
@@ -1797,7 +1845,7 @@ const Dashboard = () => {
                                     <div className="mt-6 flex justify-end space-x-4">
                                         <button
                                             onClick={() => setIsViewingBookingDetails(false)}
-                                            className="px-4 py-2 bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200"
+                                            className={`px-4 py-2 ${darkMode ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'} rounded-lg`}
                                         >
                                             Close
                                         </button>
@@ -1807,7 +1855,7 @@ const Dashboard = () => {
                                             <select
                                                 value={newStatus}
                                                 onChange={(e) => setNewStatus(e.target.value)}
-                                                className="mr-2 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                className={`mr-2 px-3 py-2 border ${darkMode ? 'bg-gray-700 text-white border-gray-600 focus:ring-blue-400' : 'border-gray-300 focus:ring-blue-500'} rounded-md text-sm focus:outline-none focus:ring-2`}
                                                 disabled={isUpdatingStatus}
                                             >
                                                 <option value="">Change Status</option>

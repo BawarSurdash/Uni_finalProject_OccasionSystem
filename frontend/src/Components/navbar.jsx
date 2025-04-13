@@ -202,7 +202,7 @@ const Navbar = () => {
                                 <div className="flex items-center">
                                     <div className="relative">
                                         <Link
-                                            to="/profile"
+                                            to="/profile?tab=notifications"
                                             className={`flex items-center ${
                                                 darkMode ? '!text-white hover:!text-white' : 'text-gray-700 hover:text-orange-500'
                                             } transition-all duration-300`}
@@ -334,24 +334,34 @@ const Navbar = () => {
                             <>
                                 <Link 
                                     to="/profile" 
-                                    className={`flex items-center px-3 py-2 ${
-                                        darkMode ? '!text-white hover:!text-white' : 'text-gray-700 hover:text-orange-500'
+                                    className={`block px-3 py-2 text-base font-medium ${
+                                        darkMode 
+                                            ? '!text-white hover:bg-gray-700 hover:!text-white hover:border-gray-300' 
+                                            : 'text-gray-700 hover:bg-orange-50 hover:text-orange-500 hover:border-orange-500'
                                     } transition-all duration-300 hover:translate-x-2 
                                     rounded-md border-l-4 border-transparent`}
                                     onClick={toggleMenu}
                                     style={darkMode ? {color: 'white'} : {}}
                                 >
-                                    <div className="flex items-center">
-                                        {/* Adding animation to mobile notification icon */}
-                                        <BsBell className="w-5 h-5 transform transition-all duration-300 hover:scale-125 hover:rotate-12" />
-                                        {unreadCount > 0 && (
-                                            <span className="absolute ml-3 -mt-2 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
-                                                {unreadCount > 9 ? '9+' : unreadCount}
-                                            </span>
-                                        )}
-                                        <CgProfile className="w-5 h-5 ml-2" />
-                                        <span className="ml-2">Profile</span>
-                                    </div>
+                                    Profile
+                                </Link>
+                                <Link 
+                                    to="/profile?tab=notifications" 
+                                    className={`block px-3 py-2 text-base font-medium ${
+                                        darkMode 
+                                            ? '!text-white hover:bg-gray-700 hover:!text-white hover:border-gray-300' 
+                                            : 'text-gray-700 hover:bg-orange-50 hover:text-orange-500 hover:border-orange-500'
+                                    } transition-all duration-300 hover:translate-x-2 
+                                    rounded-md border-l-4 border-transparent`}
+                                    onClick={toggleMenu}
+                                    style={darkMode ? {color: 'white'} : {}}
+                                >
+                                    Notifications
+                                    {unreadCount > 0 && (
+                                        <span className="ml-2 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                                            {unreadCount > 9 ? '9+' : unreadCount}
+                                        </span>
+                                    )}
                                 </Link>
                             </>
                         )}
