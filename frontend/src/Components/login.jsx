@@ -12,11 +12,12 @@ const Login = ({ darkMode }) => {
         setValues({...values, [e.target.name]: e.target.value});
     } 
     const navigate=useNavigate();
-    const handleSubmit = async  (e) => {
-        console.log(values);
+    const handleSubmit = async (e) => {
+        console.log("Login form submitted with values:", values);
         e.preventDefault();
         try {
-            const response = await axios.post('http://localhost:3001/auth/login', 
+            // First get the user object to check role
+            const userInfoResponse = await axios.post('http://localhost:3001/auth/login', 
                 values,
                 {
                     headers: {
@@ -25,8 +26,59 @@ const Login = ({ darkMode }) => {
                 }
             );
             
-            if(response.status === 200){
-                localStorage.setItem('token', response.data.token);
+            if(userInfoResponse.status === 200){
+                console.log("Login successful, response:", userInfoResponse.data);
+                localStorage.setItem('token', userInfoResponse.data.token);
+                localStorage.setItem('username', values.username);
+                
+                // Get user details with role information
+                try {
+                    console.log("Getting user details...");
+                    // Try user endpoint (Bearer token auth)
+                    const userResponse = await axios.get('http://localhost:3001/auth/user', {
+                        headers: { Authorization: `Bearer ${userInfoResponse.data.token}` }
+                    });
+                    
+                    console.log("User data:", userResponse.data);
+                    if (userResponse.data && userResponse.data.role) {
+                        localStorage.setItem('userRole', userResponse.data.role);
+                        console.log("User role stored:", userResponse.data.role);
+                        
+                        // Check if user is admin
+                        if (userResponse.data.role.toLowerCase() === 'admin') {
+                            console.log("Admin user detected, redirecting to dashboard");
+                            navigate('/dashboard');
+                            return;
+                        }
+                    }
+                } catch (userError) {
+                    console.error("Error getting user details with bearer token:", userError);
+                    
+                    // Fallback to profile endpoint (accessToken auth)
+                    try {
+                        console.log("Trying profile endpoint...");
+                        const profileResponse = await axios.get('http://localhost:3001/auth/profile', {
+                            headers: { accessToken: userInfoResponse.data.token }
+                        });
+                        
+                        console.log("Profile data:", profileResponse.data);
+                        if (profileResponse.data && profileResponse.data.role) {
+                            localStorage.setItem('userRole', profileResponse.data.role);
+                            console.log("User role stored from profile:", profileResponse.data.role);
+                            
+                            // Check if user is admin
+                            if (profileResponse.data.role.toLowerCase() === 'admin') {
+                                console.log("Admin user detected from profile, redirecting to dashboard");
+                                navigate('/dashboard');
+                                return;
+                            }
+                        }
+                    } catch (profileError) {
+                        console.error("Error getting profile details:", profileError);
+                    }
+                }
+                
+                // If we got here, user is not admin, go to homepage
                 navigate('/');
             }
         } catch (error) {

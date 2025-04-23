@@ -8,7 +8,12 @@ import {
     UserOutlined,
     SettingOutlined,
     CommentOutlined,
-    StarOutlined
+    StarOutlined,
+    HomeOutlined,
+    BarChartOutlined,
+    LayoutOutlined,
+    FundOutlined,
+    CrownOutlined
 } from '@ant-design/icons';
 import { Layout, Menu, theme } from 'antd';
 import { useNavigate } from 'react-router-dom';
@@ -18,10 +23,12 @@ import Profile from './profile';
 import OrderHistory from './orderhistory';
 import AdminNotifications from './notification';
 import Feedback from './feedback';
+import { RiDashboardLine } from "react-icons/ri";
 const { Header, Content, Footer, Sider } = Layout;
 
-const Dashboard = () => {
+const Dashboard = ({ initialTab }) => {
     const navigate = useNavigate();
+    const [authorized, setAuthorized] = useState(false);
     const [listOfPosts, setListOfPosts] = useState([]);
     const [formData, setFormData] = useState({
         title: '',
@@ -34,7 +41,7 @@ const Dashboard = () => {
     });
     const [editing, setEditing] = useState(null);
     const [isFormVisible, setIsFormVisible] = useState(false);
-    const [activeTab, setActiveTab] = useState('createPost');
+    const [activeTab, setActiveTab] = useState(initialTab || 'createPost');
     const [bookings, setBookings] = useState([]);
     const [isLoadingBookings, setIsLoadingBookings] = useState(false);
     const [selectedBooking, setSelectedBooking] = useState(null);
@@ -48,6 +55,7 @@ const Dashboard = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [bookingsPerPage] = useState(10);
     const [darkMode, setDarkMode] = useState(localStorage.getItem('darkMode') === 'true' || false);
+    const [userRole, setUserRole] = useState('');
     const [stats, setStats] = useState({
         totalPosts: 0,
         specialPosts: 0,
@@ -109,10 +117,34 @@ const Dashboard = () => {
             icon: <SettingOutlined />,
             label: 'Settings',
             className: 'text-white'
+        },
+        {
+            key: 'logout',
+            icon: <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                <polyline points="16 17 21 12 16 7"></polyline>
+                <line x1="21" y1="12" x2="9" y2="12"></line>
+              </svg>,
+            label: 'Logout',
+            className: 'text-white',
+            style: { color: '#ff6b6b' }
         }
     ];
 
     const handleMenuClick = (item) => {
+        if (item.key === 'logout') {
+            // Handle logout
+            localStorage.removeItem('token');
+            localStorage.removeItem('userRole');
+            navigate('/login');
+            return;
+        }
+        
+        if (item.key === 'profile') {
+            // Profile should be handled within the dashboard now
+            setActiveTab(item.key);
+            return;
+        }
         setActiveTab(item.key);
     };
 
@@ -126,6 +158,42 @@ const Dashboard = () => {
         bottom: 0,
         display: 'flex',
         flexDirection: 'column'
+    };
+
+    // Update the homeButtonStyle with smaller dimensions
+    const homeButtonStyle = {
+        background: 'transparent',
+        color: darkMode ? '#fff' : '#001529',
+        border: `1px solid ${darkMode ? '#444' : '#e0e0e0'}`,
+        borderRadius: '4px',
+        padding: '4px 12px',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        fontWeight: '500',
+        fontSize: '13px',
+        transition: 'all 0.2s ease',
+        marginRight: '12px',
+        boxShadow: 'none',
+        height: '32px'
+    };
+
+    // Update the logout button style to be smaller
+    const logoutButtonStyle = {
+        background: 'transparent',
+        color: darkMode ? '#ff6b6b' : '#d32f2f',
+        border: darkMode ? '1px solid #444' : '1px solid #ffcdd2',
+        borderRadius: '4px',
+        padding: '4px 12px',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        fontWeight: '500',
+        fontSize: '13px',
+        transition: 'all 0.2s ease',
+        height: '32px'
     };
 
     const categories = [
@@ -593,29 +661,197 @@ const Dashboard = () => {
         return statusMatch && paymentMatch && dateMatch;
     });
 
+    // UseEffect to handle initialTab changes
+    useEffect(() => {
+        if (initialTab) {
+            setActiveTab(initialTab);
+        }
+    }, [initialTab]);
+
+    // Add useEffect to check admin status when the component mounts
+    useEffect(() => {
+        const verifyAdminAccess = async () => {
+            try {
+                // First check if there's a token
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    console.log("Dashboard: No token found, redirecting to login");
+                    navigate('/login');
+                    return;
+                }
+                
+                // Check localStorage first
+                const storedUserRole = localStorage.getItem('userRole');
+                if (storedUserRole) {
+                    setUserRole(storedUserRole);
+                    const isAdmin = storedUserRole.toLowerCase() === 'admin' || storedUserRole.toLowerCase() === 'super admin';
+                    
+                    if (!isAdmin) {
+                        console.log("Dashboard: User is not an admin, redirecting to home");
+                        localStorage.removeItem('userRole'); // Clear cached role
+                        navigate('/');
+                        return;
+                    }
+                    return;
+                }
+                
+                // If not in localStorage, check with the server
+                try {
+                    const response = await axios.get('http://localhost:3001/auth/profile', {
+                        headers: { accessToken: token }
+                    });
+                    
+                    if (response.data && response.data.role) {
+                        const role = response.data.role;
+                        setUserRole(role);
+                        localStorage.setItem('userRole', role);
+                        
+                        const isAdmin = role.toLowerCase() === 'admin' || role.toLowerCase() === 'super admin';
+                        
+                        if (!isAdmin) {
+                            console.log("Dashboard: User is not an admin according to profile, redirecting to home");
+                            localStorage.removeItem('userRole'); // Clear cached role
+                            navigate('/');
+                            return;
+                        }
+                    } else {
+                        console.log("Dashboard: No role found in profile, redirecting to home");
+                        localStorage.removeItem('userRole'); // Clear cached role
+                        navigate('/');
+                    }
+                } catch (error) {
+                    console.error("Dashboard: Error checking admin status:", error);
+                    localStorage.removeItem('userRole'); // Clear cached role
+                    navigate('/');
+                }
+            } catch (error) {
+                console.error("Dashboard: Error verifying admin access:", error);
+                localStorage.removeItem('userRole'); // Clear cached role
+                navigate('/');
+            }
+        };
+        
+        // Immediate check on mount
+        verifyAdminAccess();
+        
+        // Return cleanup function
+        return () => {
+            console.log("Dashboard component unmounted");
+        };
+    }, [navigate]);
+
+    // Early verification before rendering anything
+    useEffect(() => {
+        const token = localStorage.getItem('token');
+        const storedUserRole = localStorage.getItem('userRole');
+        
+        if (!token) {
+            console.log("Dashboard: No token found, redirecting to login");
+            navigate('/login');
+            return;
+        }
+        
+        if (!storedUserRole || (storedUserRole.toLowerCase() !== 'admin' && storedUserRole.toLowerCase() !== 'super admin')) {
+            console.log("Dashboard: Not an admin user, redirecting to home");
+            localStorage.removeItem('userRole');
+            navigate('/');
+            return;
+        }
+        
+        // If we get here, the user is authorized
+        setAuthorized(true);
+    }, [navigate]);
+    
+    // If not authorized, don't render anything
+    if (!authorized) {
+        return (
+            <div className="min-h-screen flex justify-center items-center flex-col">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500 mb-4"></div>
+                <p className="text-gray-600">Checking permissions...</p>
+            </div>
+        );
+    }
+    
+    const goToHome = () => {
+        navigate('/');
+    };
+    
     return (
         <Layout hasSider className={darkMode ? 'dark-theme' : ''}>
-            <Sider style={siderStyle} width={200}>
-                <div className="p-4">
-                    <h1 className="text-white text-xl font-bold mb-6">Dashboard</h1>
+            <Sider style={siderStyle} breakpoint="lg" collapsedWidth="0">
+                <div
+                    style={{
+                        height: 40,
+                        margin: '16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                    }}
+                >
+                    <RiDashboardLine style={{ fontSize: '24px', color: 'white' }} />
                 </div>
                 <Menu
-                    theme={darkMode ? "dark" : "dark"} // Always dark for sidebar
+                    theme="dark"
                     mode="inline"
-                    selectedKeys={[activeTab]}
+                    defaultSelectedKeys={[activeTab]}
                     items={menuItems}
                     onClick={handleMenuClick}
-                    className="flex-1"
-                    style={{ borderRight: 0 }}
                 />
-                <div className="mt-auto mb-4 px-4">
-                    <Logout />
-                </div>
             </Sider>
             <Layout style={{ marginLeft: 200 }}>
-                <Header style={{ padding: 0, background: darkMode ? '#1f2937' : colorBgContainer }}>
-                    <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-                        <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Admin Dashboard</h1>
+                <Header style={{ 
+                    padding: '0 20px', 
+                    background: darkMode ? '#1a1a1a' : colorBgContainer,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    boxShadow: darkMode ? '0 1px 3px rgba(0,0,0,0.3)' : '0 1px 3px rgba(0,0,0,0.1)',
+                    height: '64px'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                        <button
+                            style={homeButtonStyle}
+                            onClick={goToHome}
+                            onMouseOver={(e) => {
+                                e.currentTarget.style.background = darkMode ? '#383838' : '#f5f5f5';
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                e.currentTarget.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.1)';
+                            }}
+                            onMouseOut={(e) => {
+                                e.currentTarget.style.background = 'transparent';
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = 'none';
+                            }}
+                        >
+                            <HomeOutlined style={{ fontSize: '14px' }} />
+                            Home
+                        </button>
+                        
+                        <button
+                            style={logoutButtonStyle}
+                            onClick={() => {
+                                localStorage.removeItem('token');
+                                localStorage.removeItem('userRole');
+                                navigate('/login');
+                            }}
+                            onMouseOver={(e) => {
+                                e.currentTarget.style.background = darkMode ? '#3b1b1b' : '#ffebee';
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                e.currentTarget.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.1)';
+                            }}
+                            onMouseOut={(e) => {
+                                e.currentTarget.style.background = 'transparent';
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = 'none';
+                            }}
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                                <polyline points="16 17 21 12 16 7"></polyline>
+                                <line x1="21" y1="12" x2="9" y2="12"></line>
+                            </svg>
+                            Logout
+                        </button>
                     </div>
                 </Header>
                 <Content style={{ margin: '24px 16px 0', overflow: 'initial' }}>
@@ -1715,9 +1951,8 @@ const Dashboard = () => {
                         )}
 
                         {activeTab === 'profile' && (
-                            <div className={`p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow`}>
-                                <h2 className={`text-2xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'} mb-6`}>Profile</h2>
-                                <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Profile settings will be implemented here.</p>
+                            <div className="p-4">
+                                <Profile active={true} darkMode={darkMode} />
                             </div>
                         )}
 

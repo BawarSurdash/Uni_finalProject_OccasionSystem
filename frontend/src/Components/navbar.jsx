@@ -4,24 +4,92 @@ import { CgProfile } from "react-icons/cg";
 import { useState, useEffect } from 'react';
 import { HiMenu, HiX } from "react-icons/hi";
 import { BsBell } from "react-icons/bs";
+import { RiDashboardLine } from "react-icons/ri";
 import axios from 'axios';
 import { useTheme } from '../contexts/ThemeContext';
 
 const Navbar = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
     const { darkMode } = useTheme();
+    
+    // Force a refresh of admin status
+    const refreshAdminStatus = () => {
+        // Clear cached role to force a fresh check
+        localStorage.removeItem('userRole');
+        checkIfAdmin();
+    };
 
-    // Check auth status on component mount
+    // Check auth status on component mount and whenever the component renders
     useEffect(() => {
         const token = localStorage.getItem('token');
         setIsLoggedIn(!!token);
         
         if (token) {
             fetchUnreadCount();
+            checkIfAdmin();
+        } else {
+            // Clear any admin status if no token
+            setIsAdmin(false);
+            localStorage.removeItem('userRole');
         }
+        
+        // Set up an event listener for role changes
+        window.addEventListener('user-role-change', refreshAdminStatus);
+        
+        return () => {
+            window.removeEventListener('user-role-change', refreshAdminStatus);
+        };
     }, []);
+
+    // Check if user is admin - always fetch fresh data
+    const checkIfAdmin = async () => {
+        setIsAdmin(false); // Reset admin status during check
+        
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) return;
+
+            // Try profile endpoint first
+            try {
+                const response = await axios.get('http://localhost:3001/auth/profile', {
+                    headers: { accessToken: token }
+                });
+                
+                if (response.data && response.data.role) {
+                    const isAdminRole = response.data.role.toLowerCase() === 'admin' || 
+                                      response.data.role.toLowerCase() === 'super admin';
+                    
+                    setIsAdmin(isAdminRole);
+                    localStorage.setItem('userRole', response.data.role);
+                    return;
+                }
+            } catch (profileError) {
+                console.error('Error checking admin status with profile endpoint:', profileError);
+            }
+
+            // Fallback to user endpoint if profile fails
+            try {
+                const userResponse = await axios.get('http://localhost:3001/auth/user', {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+
+                if (userResponse.data && userResponse.data.role) {
+                    const isAdminRole = userResponse.data.role.toLowerCase() === 'admin' || 
+                                      userResponse.data.role.toLowerCase() === 'super admin';
+                    
+                    setIsAdmin(isAdminRole);
+                    localStorage.setItem('userRole', userResponse.data.role);
+                }
+            } catch (userError) {
+                console.error('Error checking user endpoint:', userError);
+            }
+        } catch (error) {
+            console.error('Error checking admin status:', error);
+        }
+    };
 
     // Fetch unread notification count
     const fetchUnreadCount = async () => {
@@ -42,6 +110,9 @@ const Navbar = () => {
         
         const interval = setInterval(() => {
             fetchUnreadCount();
+            
+            // Also refresh admin status periodically
+            checkIfAdmin();
         }, 30000);
         
         return () => clearInterval(interval);
@@ -164,6 +235,29 @@ const Navbar = () => {
                                 Contact
                             </span>
                         </NavLink>
+                        {/* Dashboard Link - Only show if user is admin */}
+                        {isLoggedIn && isAdmin && (
+                            <NavLink 
+                                to="/dashboard" 
+                                className={({ isActive }) => 
+                                    `relative px-3 py-2 text-sm font-medium transition-all duration-300 ${
+                                        isActive 
+                                            ? darkMode ? '!text-white !font-bold' : 'text-orange-500' 
+                                            : darkMode 
+                                                ? '!text-white hover:!text-white' 
+                                                : 'text-gray-700 hover:text-orange-500 hover:-translate-y-0.5 hover:shadow-sm'
+                                    }`
+                                }
+                                style={darkMode ? {color: 'white'} : {}}
+                            >
+                                <span className="flex items-center">
+                                    <RiDashboardLine className="mr-1" />
+                                    <span className="block transition-all duration-300 hover:skew-y-2">
+                                        Dashboard
+                                    </span>
+                                </span>
+                            </NavLink>
+                        )}
                     </div>
 
                     {/* Auth Buttons - Unified Scale Effect */}
@@ -364,6 +458,22 @@ const Navbar = () => {
                                     )}
                                 </Link>
                             </>
+                        )}
+                        {isLoggedIn && isAdmin && (
+                            <Link 
+                                to="/dashboard" 
+                                className={`block px-3 py-2 text-base font-medium ${
+                                    darkMode 
+                                        ? '!text-white hover:bg-gray-700 hover:!text-white hover:border-purple-300' 
+                                        : 'text-gray-700 hover:bg-purple-50 hover:text-purple-500 hover:border-purple-500'
+                                } transition-all duration-300 hover:translate-x-2 
+                                rounded-md border-l-4 border-transparent flex items-center`}
+                                onClick={toggleMenu}
+                                style={darkMode ? {color: 'white'} : {}}
+                            >
+                                <RiDashboardLine className="mr-2" />
+                                Admin Dashboard
+                            </Link>
                         )}
                     </div>
                 </div>

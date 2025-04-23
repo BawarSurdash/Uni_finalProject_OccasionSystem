@@ -15,6 +15,8 @@ import OrderForm from './Components/orderform'
 import BookingSuccess from './Components/BookingSuccess'
 import BookingDetail from './Components/BookingDetail'
 import Dashboard from './Components/admin/Dashboard'
+import AdminProfile from './Components/admin/profile'
+import AdminRoute from './Components/AdminRoute'
 import ThemeProvider, { useTheme } from './contexts/ThemeContext'
 
 function AppRoutes() {
@@ -30,13 +32,46 @@ function AppRoutes() {
       <Route path='/events' element={<Event />} />
       <Route path='/about' element={<About />} />
       <Route path='/contact' element={<Contact />} />
-      <Route path='/dashboard' element={<Dashboard />} />
+      
+      {/* Admin Routes */}
+      <Route path='/dashboard/*' element={
+        <AdminRoute>
+          <Dashboard />
+        </AdminRoute>
+      } />
+      
+      {/* Admin Profile - Both Admin and Super Admin can access */}
+      <Route path='/admin/profile' element={
+        <AdminRoute>
+          <Dashboard initialTab="profile" />
+        </AdminRoute>
+      } />
+      
+      {/* Role Management - Only Super Admin can access */}
+      <Route path='/admin/roles' element={
+        <AdminRoute superAdminOnly={true}>
+          <Dashboard initialTab="profile" />
+        </AdminRoute>
+      } />
+      
+      {/* Catch-all for any dashboard-related paths */}
+      <Route path='/admin/*' element={
+        <AdminRoute>
+          <Dashboard />
+        </AdminRoute>
+      } />
+      
       <Route path='/event/:id' element={<EventDetail />} />
       <Route path="/profile" element={<Profile />} />
       <Route path="/servicesdetail/:id" element={<ServicesDetail />} />
       <Route path="/book/:id" element={<OrderForm />} />
       <Route path="/success" element={<BookingSuccess />} />
       <Route path="/booking/:id" element={<BookingDetail darkMode={darkMode} />} />
+      
+      {/* Redirect dashboard URLs without the AdminRoute to proper route */}
+      <Route path="*" element={
+        <Navigate to="/" replace />
+      } />
     </Routes>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import Navbar from "./navbar";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { FaSignOutAlt, FaMoon, FaSun } from "react-icons/fa";
 import { motion } from "framer-motion";
 import axios from "axios";
@@ -107,6 +107,7 @@ const Profile = () => {
   const [bookingToCancel, setBookingToCancel] = useState(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [cancelledBookingId, setCancelledBookingId] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   
   // Use the global theme context instead of local state
   const { darkMode, toggleDarkMode } = useTheme();
@@ -130,6 +131,11 @@ const Profile = () => {
           }
         });
         setUserData(response.data);
+        
+        // Check if user is admin
+        if (response.data.role?.toLowerCase() === 'admin') {
+          setIsAdmin(true);
+        }
       } catch (error) {
         console.error("Error fetching user data:", error);
         navigate('/login');
@@ -272,6 +278,61 @@ const Profile = () => {
     { id: "settings", label: "Settings", icon: "⚙️" },
   ];
 
+  // Add this section to render after the navigation tabs
+  const renderAdminSection = () => {
+    if (!isAdmin) return null;
+    
+    return (
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className={`mb-8 p-4 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-purple-50 border-purple-200'} rounded-lg border shadow-sm`}
+      >
+        <div className="flex items-center mb-3">
+          <div className={`p-2 rounded-full mr-3 ${darkMode ? 'bg-purple-900' : 'bg-purple-100'}`}>
+            <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 ${darkMode ? 'text-purple-300' : 'text-purple-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h2 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-purple-800'}`}>Admin Access</h2>
+        </div>
+        
+        <p className={`mb-4 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+          You have administrative privileges. Access the admin profile to manage users and system settings.
+        </p>
+        
+        <Link 
+          to="/admin/profile" 
+          className={`inline-flex items-center px-4 py-2 rounded-lg font-medium transition-colors ${
+            darkMode 
+              ? 'bg-purple-700 text-white hover:bg-purple-600' 
+              : 'bg-purple-600 text-white hover:bg-purple-700'
+          }`}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7" />
+          </svg>
+          Go to Admin Profile
+        </Link>
+        
+        <Link 
+          to="/dashboard" 
+          className={`ml-3 inline-flex items-center px-4 py-2 rounded-lg font-medium transition-colors ${
+            darkMode 
+              ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' 
+              : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+          }`}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+          </svg>
+          Dashboard
+        </Link>
+      </motion.div>
+    );
+  };
+
   return (
     <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gray-50'} pt-16 transition-colors duration-200`}>
       <Navbar />
@@ -344,6 +405,9 @@ const Profile = () => {
             Logout
           </button>
         </div>
+        
+        {/* Admin section - place this right after the profile header */}
+        {renderAdminSection()}
         
         {/* Enhanced Tabs */}
         <div className={`relative flex justify-center flex-wrap space-x-1 ${darkMode ? 'border-gray-700' : 'border-gray-200'} border-b pb-2 mb-6 transition-colors duration-200`}>
