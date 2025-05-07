@@ -1,4 +1,5 @@
 const express =require(('express'))
+const path = require('path');
 
 const app=express();
 
@@ -6,6 +7,16 @@ const db=require('./models');
 const cors=require('cors');
 app.use(express.json());
 app.use(cors());
+
+// Create uploads directory if it doesn't exist
+const fs = require('fs');
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// Serve static files from uploads directory
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Load manual associations
 const setupAssociations = require('./config/associations');

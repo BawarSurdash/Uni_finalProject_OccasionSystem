@@ -21,6 +21,14 @@ module.exports=(sequelize,DataTypes)=>{
             type:DataTypes.STRING,
             allowNull:false
         },
+        latitude:{
+            type:DataTypes.DECIMAL(10, 8),
+            allowNull:true
+        },
+        longitude:{
+            type:DataTypes.DECIMAL(11, 8),
+            allowNull:true
+        },
         status:{
             type:DataTypes.ENUM('pending', 'confirmed', 'cancelled', 'completed'),
             defaultValue: 'pending',

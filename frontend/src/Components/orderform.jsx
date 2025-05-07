@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import Navbar from './navbar';
 import { useTheme } from '../contexts/ThemeContext';
+import { GoogleMap, useLoadScript, Marker, StandaloneSearchBox } from '@react-google-maps/api';
 
 const OrderForm = () => {
     const navigate = useNavigate();
@@ -13,6 +14,20 @@ const OrderForm = () => {
     const [selectedAddons, setSelectedAddons] = useState(location.state?.selectedAddons || []);
     const [totalPrice, setTotalPrice] = useState(location.state?.totalPrice || 0);
     const [userData, setUserData] = useState(null);
+    const [currentLocation, setCurrentLocation] = useState({ lat: 36.1901, lng: 43.9930 }); // Default to Erbil
+    const [selectedLocation, setSelectedLocation] = useState(null);
+    const [tempLocation, setTempLocation] = useState(null);
+    const [mapLoaded, setMapLoaded] = useState(false);
+    const [searchBoxLoaded, setSearchBoxLoaded] = useState(false);
+    const mapRef = useRef(null);
+    const searchBoxRef = useRef(null);
+
+    const libraries = ["places"];
+
+    const { isLoaded } = useLoadScript({
+        googleMapsApiKey: "AIzaSyB41DRUbKWJHPxaFjMAwdrzWzbVKartNGg", // This is a placeholder key. You should replace it with your actual Google Maps API key
+        libraries: libraries,
+    });
 
     const availableAddons = [
         { id: 1, name: 'Candle Package', priceAdjustment: 15, description: 'Set of 24 elegant decorative candles' },
@@ -109,6 +124,22 @@ const OrderForm = () => {
         fetchUserData();
     }, []);
 
+    const fetchAddressFromCoords = async (lat, lng) => {
+        try {
+            const response = await axios.get(
+                `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=AIzaSyB41DRUbKWJHPxaFjMAwdrzWzbVKartNGg`
+            );
+            if (response.data.results && response.data.results.length > 0) {
+                const address = response.data.results[0].formatted_address;
+                return address;
+            }
+            return "";
+        } catch (error) {
+            console.error("Error fetching address:", error);
+            return "";
+        }
+    };
+
     const handleChange = (e) => {
         const { name, value, files } = e.target;
         
@@ -161,19 +192,44 @@ const OrderForm = () => {
                 navigate('/login');
                 return;
             }
+
+            // Check if location is selected
+            if (!selectedLocation) {
+                alert('Please select and confirm your location on the map');
+                return;
+            }
+            
+            // Create FormData object to handle file upload
+            const formDataToSend = new FormData();
+            
+            // Add all form fields to FormData
+            formDataToSend.append('fullName', formData.fullName);
+            formDataToSend.append('email', formData.email);
+            formDataToSend.append('phoneNumber', formData.phoneNumber);
+            formDataToSend.append('address', formData.address);
+            formDataToSend.append('eventDate', formData.eventDate);
+            formDataToSend.append('additionalRequests', formData.additionalRequests);
+            formDataToSend.append('paymentMethod', formData.paymentMethod);
+            formDataToSend.append('totalPrice', formData.totalPrice);
+            formDataToSend.append('serviceId', id);
+            
+            // Add location coordinates
+            formDataToSend.append('latitude', selectedLocation.lat);
+            formDataToSend.append('longitude', selectedLocation.lng);
+            
+            // Add payment proof file if it exists
+            if (formData.paymentProof) {
+                formDataToSend.append('paymentProof', formData.paymentProof);
+            }
             
             // Log what's being sent
-            console.log("Sending booking data:", {
-                ...formData,
-                serviceId: id
-            });
+            console.log("Sending booking data with file upload");
+            console.log("Location coordinates:", selectedLocation.lat, selectedLocation.lng);
             
-            const response = await axios.post('http://localhost:3001/booking', {
-                ...formData,
-                serviceId: id
-            }, {
+            const response = await axios.post('http://localhost:3001/booking', formDataToSend, {
                 headers: { 
-                    accessToken: token  // Changed from Authorization to accessToken
+                    accessToken: token,
+                    'Content-Type': 'multipart/form-data'
                 }
             });
             
@@ -195,6 +251,176 @@ const OrderForm = () => {
             console.error('Error submitting order:', error);
             alert('Failed to create booking: ' + (error.response?.data?.error || error.message));
         }
+    };
+
+    const onMapClick = useCallback((e) => {
+        setTempLocation({
+            lat: e.latLng.lat(),
+            lng: e.latLng.lng()
+        });
+    }, []);
+
+    const onMapLoad = useCallback((map) => {
+        mapRef.current = map;
+        setMapLoaded(true);
+    }, []);
+
+    const onSearchBoxLoad = (ref) => {
+        searchBoxRef.current = ref;
+        setSearchBoxLoaded(true);
+    };
+
+    const onPlacesChanged = () => {
+        if (searchBoxRef.current) {
+            const places = searchBoxRef.current.getPlaces();
+            if (places && places.length > 0) {
+                const place = places[0];
+                if (place.geometry && place.geometry.location) {
+                    const newLocation = {
+                        lat: place.geometry.location.lat(),
+                        lng: place.geometry.location.lng()
+                    };
+                    
+                    setTempLocation(newLocation);
+                    
+                    // Center map on the selected location
+                    if (mapRef.current) {
+                        mapRef.current.panTo(newLocation);
+                        mapRef.current.setZoom(16);
+                    }
+                }
+            }
+        }
+    };
+
+    const mapContainerStyle = {
+        width: '100%',
+        height: '360px',
+        borderRadius: '0.75rem',
+    };
+
+    const mapOptions = {
+        disableDefaultUI: false,
+        zoomControl: true,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: true,
+        styles: darkMode ? [
+            { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
+            { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
+            { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
+            {
+                featureType: "administrative.locality",
+                elementType: "labels.text.fill",
+                stylers: [{ color: "#d59563" }],
+            },
+            {
+                featureType: "poi",
+                elementType: "labels.text.fill",
+                stylers: [{ color: "#d59563" }],
+            },
+            {
+                featureType: "poi.park",
+                elementType: "geometry",
+                stylers: [{ color: "#263c3f" }],
+            },
+            {
+                featureType: "poi.park",
+                elementType: "labels.text.fill",
+                stylers: [{ color: "#6b9a76" }],
+            },
+            {
+                featureType: "road",
+                elementType: "geometry",
+                stylers: [{ color: "#38414e" }],
+            },
+            {
+                featureType: "road",
+                elementType: "geometry.stroke",
+                stylers: [{ color: "#212a37" }],
+            },
+            {
+                featureType: "road",
+                elementType: "labels.text.fill",
+                stylers: [{ color: "#9ca5b3" }],
+            },
+            {
+                featureType: "road.highway",
+                elementType: "geometry",
+                stylers: [{ color: "#746855" }],
+            },
+            {
+                featureType: "road.highway",
+                elementType: "geometry.stroke",
+                stylers: [{ color: "#1f2835" }],
+            },
+            {
+                featureType: "road.highway",
+                elementType: "labels.text.fill",
+                stylers: [{ color: "#f3d19c" }],
+            },
+            {
+                featureType: "transit",
+                elementType: "geometry",
+                stylers: [{ color: "#2f3948" }],
+            },
+            {
+                featureType: "transit.station",
+                elementType: "labels.text.fill",
+                stylers: [{ color: "#d59563" }],
+            },
+            {
+                featureType: "water",
+                elementType: "geometry",
+                stylers: [{ color: "#17263c" }],
+            },
+            {
+                featureType: "water",
+                elementType: "labels.text.fill",
+                stylers: [{ color: "#515c6d" }],
+            },
+            {
+                featureType: "water",
+                elementType: "labels.text.stroke",
+                stylers: [{ color: "#17263c" }],
+            },
+        ] : []
+    };
+
+    const confirmLocation = async () => {
+        if (tempLocation) {
+            setSelectedLocation(tempLocation);
+            const address = await fetchAddressFromCoords(tempLocation.lat, tempLocation.lng);
+            setFormData(prev => ({
+                ...prev,
+                address: address
+            }));
+        } else {
+            alert("Please select a location on the map first");
+        }
+    };
+
+    const removeLocation = () => {
+        setTempLocation(null);
+        setSelectedLocation(null);
+        setFormData(prev => ({
+            ...prev,
+            address: ''
+        }));
+    };
+
+    const customMarkerIcon = {
+        url: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='36px' height='36px'%3E%3Cpath fill='%23F97316' d='M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z'/%3E%3C/svg%3E",
+        scaledSize: { width: 36, height: 36 },
+        origin: { x: 0, y: 0 },
+        anchor: { x: 18, y: 36 },
+    };
+
+    const tempMarkerIcon = {
+        url: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='36px' height='36px'%3E%3Cpath fill='%233B82F6' d='M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z'/%3E%3C/svg%3E",
+        scaledSize: { width: 36, height: 36 },
+        origin: { x: 0, y: 0 },
+        anchor: { x: 18, y: 36 },
     };
 
     return (
@@ -284,7 +510,137 @@ const OrderForm = () => {
                             </p>
                         </div>
 
-                        {/* New Address Field */}
+                        {/* Map for location selection */}
+                        <div>
+                            <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
+                                Your Location
+                            </label>
+                            
+                            <div className={`rounded-xl overflow-hidden ${darkMode ? 'bg-gray-700' : 'bg-gray-100'} shadow-lg mb-3`}>
+                                <div className="p-3">
+                                    {isLoaded ? (
+                                        <StandaloneSearchBox
+                                            onLoad={onSearchBoxLoad}
+                                            onPlacesChanged={onPlacesChanged}
+                                        >
+                                            <div className="flex items-center relative">
+                                                <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                                                    </svg>
+                                                </div>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Search for a location..."
+                                                    className={`w-full pl-10 pr-3 py-2 ${darkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-700 border-gray-300'} border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500`}
+                                                />
+                                            </div>
+                                        </StandaloneSearchBox>
+                                    ) : (
+                                        <div className={`w-full pl-10 pr-3 py-2 ${darkMode ? 'bg-gray-800 text-gray-500' : 'bg-white text-gray-400'} border rounded-lg`}>
+                                            Loading search...
+                                        </div>
+                                    )}
+                                </div>
+                                
+                                <div className="relative">
+                                    {!isLoaded ? (
+                                        <div className="h-64 flex items-center justify-center">
+                                            <div className="animate-pulse flex flex-col items-center">
+                                                <div className={`h-16 w-16 rounded-full ${darkMode ? 'bg-gray-600' : 'bg-gray-300'} mb-4`}></div>
+                                                <div className={`h-4 w-24 ${darkMode ? 'bg-gray-600' : 'bg-gray-300'} rounded mb-2`}></div>
+                                                <div className={`h-3 w-32 ${darkMode ? 'bg-gray-600' : 'bg-gray-300'} rounded`}></div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <GoogleMap
+                                            mapContainerStyle={mapContainerStyle}
+                                            center={selectedLocation || tempLocation || currentLocation}
+                                            zoom={15}
+                                            onClick={onMapClick}
+                                            onLoad={onMapLoad}
+                                            options={mapOptions}
+                                        >
+                                            {tempLocation && !selectedLocation && (
+                                                <Marker
+                                                    position={tempLocation}
+                                                    icon={tempMarkerIcon}
+                                                    animation={window.google.maps.Animation.DROP}
+                                                />
+                                            )}
+                                            {selectedLocation && (
+                                                <Marker 
+                                                    position={selectedLocation} 
+                                                    icon={customMarkerIcon}
+                                                />
+                                            )}
+                                        </GoogleMap>
+                                    )}
+                                    
+                                    {mapLoaded && (
+                                        <div className={`absolute bottom-3 left-3 p-2 ${darkMode ? 'bg-gray-800 text-gray-300' : 'bg-white text-gray-700'} text-xs rounded-lg shadow-md flex items-center`}>
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-orange-500" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                                            </svg>
+                                            Click on the map to select your location
+                                        </div>
+                                    )}
+                                    
+                                    {tempLocation && !selectedLocation && (
+                                        <div className={`absolute top-3 left-0 right-0 mx-auto w-max p-2 ${darkMode ? 'bg-blue-900 text-blue-100' : 'bg-blue-100 text-blue-800'} text-xs rounded-lg shadow-lg`}>
+                                            Location selected - click confirm below
+                                        </div>
+                                    )}
+                                    
+                                    {selectedLocation && (
+                                        <div className={`absolute top-3 left-0 right-0 mx-auto w-max p-2 ${darkMode ? 'bg-green-900 text-green-100' : 'bg-green-100 text-green-800'} text-xs rounded-lg shadow-lg flex items-center`}>
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                            </svg>
+                                            Location confirmed
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="flex gap-2 mb-2">
+                                <button
+                                    type="button"
+                                    onClick={confirmLocation}
+                                    disabled={!tempLocation || selectedLocation}
+                                    className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-colors
+                                        ${(!tempLocation || selectedLocation) 
+                                            ? `${darkMode ? 'bg-gray-700 text-gray-500' : 'bg-gray-200 text-gray-500'} cursor-not-allowed`
+                                            : `${darkMode ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-500 hover:bg-green-600 text-white'}`
+                                        }`}
+                                >
+                                    <div className="flex items-center justify-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                        </svg>
+                                        Confirm Location
+                                    </div>
+                                </button>
+
+                                {(tempLocation || selectedLocation) && (
+                                    <button
+                                        type="button"
+                                        onClick={removeLocation}
+                                        className={`py-2 px-4 text-sm font-medium rounded-md transition-colors
+                                            ${darkMode ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
+                                    >
+                                        <div className="flex items-center justify-center">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                            </svg>
+                                            Remove
+                                        </div>
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Address Field */}
                         <div>
                             <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
                                  Address
@@ -298,6 +654,9 @@ const OrderForm = () => {
                                 placeholder="Street name, Building number, District"
                                 required
                             />
+                            <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} mt-1`}>
+                                Address is auto-filled when you confirm a location on the map, but you can edit it for more details
+                            </p>
                         </div>
 
                         <div>

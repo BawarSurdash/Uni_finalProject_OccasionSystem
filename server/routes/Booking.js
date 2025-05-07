@@ -2,6 +2,35 @@ const express=require('express');
 const router=express.Router();
 const {Booking, Users, Posts, Notification}=require('../models');
 const { validateToken } = require('../middlewares/AuthMiddleware');
+const multer = require('multer');
+const path = require('path');
+
+// Configure multer for file storage
+const storage = multer.diskStorage({
+    destination: function(req, file, cb) {
+        cb(null, path.join(__dirname, '../uploads/'));
+    },
+    filename: function(req, file, cb) {
+        cb(null, 'payment-' + Date.now() + path.extname(file.originalname));
+    }
+});
+
+// File filter to accept only images
+const fileFilter = (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+        cb(null, true);
+    } else {
+        cb(new Error('Only image files are allowed!'), false);
+    }
+};
+
+const upload = multer({ 
+    storage: storage,
+    fileFilter: fileFilter,
+    limits: {
+        fileSize: 10 * 1024 * 1024 // 10MB max
+    }
+});
 
 // Log incoming requests
 router.use((req, res, next) => {
@@ -9,17 +38,21 @@ router.use((req, res, next) => {
     next();
 });
 
-// Create booking from form submission
-router.post('/', validateToken, async(req,res)=>{
+// Create booking from form submission with file upload
+router.post('/', validateToken, upload.single('paymentProof'), async(req,res)=>{
     try {
         console.log("User from token:", req.user);
         
-        const {eventDate, totalPrice, paymentMethod, phoneNumber, address, serviceId, additionalRequests} = req.body;
+        const {eventDate, totalPrice, paymentMethod, phoneNumber, address, serviceId, additionalRequests, latitude, longitude} = req.body;
         
         // Log data for debugging
         console.log("Creating booking with data:", {
-            eventDate, totalPrice, paymentMethod, phoneNumber, address, serviceId
+            eventDate, totalPrice, paymentMethod, phoneNumber, address, serviceId, latitude, longitude
         });
+
+        // Get file path if uploaded
+        const imageProof = req.file ? `/uploads/${req.file.filename}` : null;
+        console.log("Image proof path:", imageProof);
         
         // Create new booking in database with only the fields that exist in the model
         const newBooking = await Booking.create({
@@ -28,7 +61,10 @@ router.post('/', validateToken, async(req,res)=>{
             paymentMethod,
             phoneNumber,
             address,
-            status: 'pending'
+            latitude,
+            longitude,
+            status: 'pending',
+            imageProof // Add the image proof path
             // Removed userId, postId, and additionalRequirements as they're not in the model
         });
         

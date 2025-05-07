@@ -24,6 +24,8 @@ import OrderHistory from './orderhistory';
 import AdminNotifications from './notification';
 import Feedback from './feedback';
 import { RiDashboardLine } from "react-icons/ri";
+import { GoogleMap, useLoadScript, Marker } from '@react-google-maps/api';
+
 const { Header, Content, Footer, Sider } = Layout;
 
 const Dashboard = ({ initialTab }) => {
@@ -70,10 +72,17 @@ const Dashboard = ({ initialTab }) => {
     const [bookingEndDate, setBookingEndDate] = useState(''); // For All Bookings section
     const [postStartDate, setPostStartDate] = useState('');
     const [postEndDate, setPostEndDate] = useState('');
+    const [showImageModal, setShowImageModal] = useState(false);
+    const [activeDetailsTab, setActiveDetailsTab] = useState('details');
 
     const {
         token: { colorBgContainer, borderRadiusLG },
     } = theme.useToken();
+
+    const { isLoaded } = useLoadScript({
+        googleMapsApiKey: "AIzaSyB41DRUbKWJHPxaFjMAwdrzWzbVKartNGg", // Replace with your actual API key
+        libraries: ["places"]
+    });
 
     const menuItems = [
         {
@@ -776,6 +785,28 @@ const Dashboard = ({ initialTab }) => {
         navigate('/');
     };
     
+    // Map styles
+    const mapContainerStyle = {
+        width: '100%',
+        height: '200px',
+        borderRadius: '0.5rem',
+        marginTop: '0.5rem',
+        marginBottom: '1rem'
+    };
+    
+    const mapOptions = {
+        disableDefaultUI: false,
+        zoomControl: true,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: true,
+        styles: darkMode ? [
+            { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
+            { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
+            { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] }
+        ] : []
+    };
+
     return (
         <Layout hasSider className={darkMode ? 'dark-theme' : ''}>
             <Sider style={siderStyle} breakpoint="lg" collapsedWidth="0">
@@ -1330,7 +1361,7 @@ const Dashboard = ({ initialTab }) => {
                                                         </div>
 
                                                         {formData.isSpecial && (
-                                                            <div>
+                                                            <div className="md:col-span-2">
                                                                 <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                                                                     Special Features
                                                                 </label>
@@ -1347,27 +1378,26 @@ const Dashboard = ({ initialTab }) => {
                                                                 />
                                                             </div>
                                                         )}
-
-                                                        <div className="flex justify-end space-x-3 mt-6">
-                                                            <button
-                                                                onClick={() => setEditing(null)}
-                                                                className={`px-4 py-2 border rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
-                                                                    darkMode 
-                                                                    ? 'border-gray-600 text-gray-300 hover:bg-gray-700' 
-                                                                    : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                                                                }`}
-                                                            >
-                                                                Cancel
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleUpdate(post.id)}
-                                                                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                                                            >
-                                                                Save Changes
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </div>
+                                            </div>
+                                            <div className="flex justify-end space-x-3 mt-6">
+                                                <button
+                                                    onClick={() => setEditing(null)}
+                                                    className={`px-4 py-2 border rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
+                                                        darkMode 
+                                                        ? 'border-gray-600 text-gray-300 hover:bg-gray-700' 
+                                                        : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                                                    }`}
+                                                >
+                                                    Cancel
+                                                </button>
+                                                <button
+                                                    onClick={() => handleUpdate(post.id)}
+                                                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                                >
+                                                    Save Changes
+                                                </button>
+                                            </div>
+                                        </div>
                                             ) : (
                                                 // Display post
                                                 <div>
@@ -1962,173 +1992,455 @@ const Dashboard = ({ initialTab }) => {
 
                         {/* Booking Details Modal */}
                         {isViewingBookingDetails && selectedBooking && (
-                            <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-                                <div className={`relative mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md ${darkMode ? 'bg-gray-800 text-white' : 'bg-white'}`}>
-                                    <div className={`flex justify-between items-center border-b pb-3 mb-4 ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-                                        <h3 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                                            Booking Details #{selectedBooking.id}
-                                        </h3>
+                            <div className="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                                <div className={`relative mx-auto p-0 border-0 w-11/12 md:w-3/4 lg:w-2/3 shadow-2xl rounded-xl ${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} overflow-hidden`}>
+                                    {/* Header with gradient */}
+                                    <div className={`px-6 py-4 ${darkMode ? 'bg-gradient-to-r from-blue-900 to-purple-900' : 'bg-gradient-to-r from-blue-500 to-purple-500'} text-white`}>
+                                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                                            <div>
+                                                <h3 className="text-xl font-bold flex items-center">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                                    </svg>
+                                                    Booking #{selectedBooking.id}
+                                                </h3>
+                                                {selectedBooking.Post && (
+                                                    <p className="text-white text-opacity-90 mt-1">{selectedBooking.Post.title}</p>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center space-x-3">
+                                                <div className="flex items-center">
+                                                    <div className={`px-3 py-1.5 rounded-full text-sm font-medium bg-white ${
+                                                        selectedBooking.status === 'completed' ? 'text-green-700' : 
+                                                        selectedBooking.status === 'pending' ? 'text-yellow-700' :
+                                                        selectedBooking.status === 'confirmed' ? 'text-blue-700' :
+                                                        'text-red-700'
+                                                    }`}>
+                                                        {selectedBooking.status.charAt(0).toUpperCase() + selectedBooking.status.slice(1)}
+                                                    </div>
+                                                </div>
+                                                <button 
+                                                    onClick={() => setIsViewingBookingDetails(false)}
+                                                    className="text-white hover:text-gray-200 transition-colors"
+                                                >
+                                                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                            
+                                    {/* Status information */}
+                                    <div className="px-6 py-4 border-b border-dashed border-opacity-50 border-gray-300">
+                                        <div className={`flex flex-col md:flex-row md:items-center justify-between p-3 rounded-lg ${
+                                            selectedBooking.status === 'completed' ? darkMode ? 'bg-green-900/20 text-green-400 border-green-700/50' : 'bg-green-100 text-green-800 border-green-300' :
+                                            selectedBooking.status === 'confirmed' ? darkMode ? 'bg-blue-900/20 text-blue-400 border-blue-700/50' : 'bg-blue-100 text-blue-800 border-blue-300' :
+                                            selectedBooking.status === 'pending' ? darkMode ? 'bg-yellow-900/20 text-yellow-400 border-yellow-700/50' : 'bg-yellow-100 text-yellow-800 border-yellow-300' :
+                                            darkMode ? 'bg-red-900/20 text-red-400 border-red-700/50' : 'bg-red-100 text-red-800 border-red-300'
+                                        } border`}>
+                                            <div className="flex items-center mb-2 md:mb-0">
+                                                <span className={`flex items-center justify-center w-10 h-10 rounded-full ${darkMode ? 'bg-gray-800' : 'bg-white'} mr-3 ${
+                                                    selectedBooking.status === 'completed' ? 'text-green-500' :
+                                                    selectedBooking.status === 'confirmed' ? 'text-blue-500' :
+                                                    selectedBooking.status === 'pending' ? 'text-yellow-500' :
+                                                    'text-red-500'
+                                                }`}>
+                                                    {selectedBooking.status === 'completed' && (
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                                        </svg>
+                                                    )}
+                                                    {selectedBooking.status === 'confirmed' && (
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                                        </svg>
+                                                    )}
+                                                    {selectedBooking.status === 'pending' && (
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                                                        </svg>
+                                                    )}
+                                                    {selectedBooking.status === 'cancelled' && (
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                                        </svg>
+                                                    )}
+                                                </span>
+                                                <div>
+                                                    <p className="font-medium">
+                                                        Current Status: {selectedBooking.status.charAt(0).toUpperCase() + selectedBooking.status.slice(1)}
+                                                    </p>
+                                                    <p className="text-sm opacity-80">Last updated: {formatDate(selectedBooking.updatedAt || selectedBooking.createdAt)}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center">
+                                                <div className="relative">
+                                                    <select
+                                                        className={`text-sm border rounded-md py-2 px-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                                            darkMode 
+                                                                ? 'bg-gray-700 border-gray-600 text-gray-200' 
+                                                                : 'bg-white border-gray-300'
+                                                            }`}
+                                                        onChange={(e) => {
+                                                            if (e.target.value && e.target.value !== selectedBooking.status) {
+                                                                if (window.confirm(`Change status to ${e.target.value}?`)) {
+                                                                    updateBookingStatus(selectedBooking.id, e.target.value);
+                                                                }
+                                                                e.target.value = "";  // Reset after action
+                                                            }
+                                                        }}
+                                                        defaultValue=""
+                                                    >
+                                                        <option value="" disabled>Change Status</option>
+                                                        {selectedBooking.status !== 'pending' && <option value="pending">Pending</option>}
+                                                        {selectedBooking.status !== 'confirmed' && <option value="confirmed">Confirmed</option>}
+                                                        {selectedBooking.status !== 'completed' && <option value="completed">Completed</option>}
+                                                        {selectedBooking.status !== 'cancelled' && <option value="cancelled">Cancelled</option>}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Tab navigation */}
+                                    <div className="px-6 pt-4 border-b border-gray-200 dark:border-gray-700">
+                                        <ul className="flex flex-wrap -mb-px">
+                                            <li className="mr-2">
+                                                <button
+                                                    className={`inline-block px-4 py-2 rounded-t-lg border-b-2 ${
+                                                        activeDetailsTab === 'details'
+                                                            ? darkMode
+                                                                ? 'text-blue-400 border-blue-400'
+                                                                : 'text-blue-600 border-blue-600'
+                                                            : darkMode
+                                                                ? 'text-gray-400 border-transparent hover:text-gray-300 hover:border-gray-300'
+                                                                : 'text-gray-500 border-transparent hover:text-gray-600 hover:border-gray-300'
+                                                    }`}
+                                                    onClick={() => setActiveDetailsTab('details')}
+                                                >
+                                                    <div className="flex items-center">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                                        </svg>
+                                                        Customer
+                                                    </div>
+                                                </button>
+                                            </li>
+                                            <li className="mr-2">
+                                                <button
+                                                    className={`inline-block px-4 py-2 rounded-t-lg border-b-2 ${
+                                                        activeDetailsTab === 'service'
+                                                            ? darkMode
+                                                                ? 'text-blue-400 border-blue-400'
+                                                                : 'text-blue-600 border-blue-600'
+                                                            : darkMode
+                                                                ? 'text-gray-400 border-transparent hover:text-gray-300 hover:border-gray-300'
+                                                                : 'text-gray-500 border-transparent hover:text-gray-600 hover:border-gray-300'
+                                                    }`}
+                                                    onClick={() => setActiveDetailsTab('service')}
+                                                >
+                                                    <div className="flex items-center">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                                        </svg>
+                                                        Service
+                                                    </div>
+                                                </button>
+                                            </li>
+                                            {(selectedBooking.latitude && selectedBooking.longitude) && (
+                                                <li className="mr-2">
+                                                    <button
+                                                        className={`inline-block px-4 py-2 rounded-t-lg border-b-2 ${
+                                                            activeDetailsTab === 'map'
+                                                                ? darkMode
+                                                                    ? 'text-blue-400 border-blue-400'
+                                                                    : 'text-blue-600 border-blue-600'
+                                                                : darkMode
+                                                                    ? 'text-gray-400 border-transparent hover:text-gray-300 hover:border-gray-300'
+                                                                    : 'text-gray-500 border-transparent hover:text-gray-600 hover:border-gray-300'
+                                                        }`}
+                                                        onClick={() => setActiveDetailsTab('map')}
+                                                    >
+                                                        <div className="flex items-center">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                            </svg>
+                                                            Location
+                                                        </div>
+                                                    </button>
+                                                </li>
+                                            )}
+                                            {selectedBooking.imageProof && (
+                                                <li>
+                                                    <button
+                                                        className={`inline-block px-4 py-2 rounded-t-lg border-b-2 ${
+                                                            activeDetailsTab === 'payment'
+                                                                ? darkMode
+                                                                    ? 'text-blue-400 border-blue-400'
+                                                                    : 'text-blue-600 border-blue-600'
+                                                                : darkMode
+                                                                    ? 'text-gray-400 border-transparent hover:text-gray-300 hover:border-gray-300'
+                                                                    : 'text-gray-500 border-transparent hover:text-gray-600 hover:border-gray-300'
+                                                        }`}
+                                                        onClick={() => setActiveDetailsTab('payment')}
+                                                    >
+                                                        <div className="flex items-center">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                                                            </svg>
+                                                            Payment
+                                                        </div>
+                                                    </button>
+                                                </li>
+                                            )}
+                                        </ul>
+                                    </div>
+                                    
+                                    {/* Tab content */}
+                                    <div className="p-6">
+                                        {/* Customer tab */}
+                                        {activeDetailsTab === 'details' && (
+                                            <div className="space-y-6">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                    <div>
+                                                        <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                                                            Customer Information
+                                                        </h3>
+                                                        <div className="space-y-4">
+                                                            {selectedBooking.User && (
+                                                                <>
+                                                                    <div className="flex justify-between">
+                                                                        <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Username:</span>
+                                                                        <span className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{selectedBooking.User.username}</span>
+                                                                    </div>
+                                                                    <div className="flex justify-between">
+                                                                        <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Email:</span>
+                                                                        <span className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{selectedBooking.User.email}</span>
+                                                                    </div>
+                                                                </>
+                                                            )}
+                                                            <div className="flex justify-between">
+                                                                <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Phone Number:</span>
+                                                                <span className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{selectedBooking.phoneNumber}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div>
+                                                        <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                                                            Booking Details
+                                                        </h3>
+                                                        <div className="space-y-4">
+                                                            <div className="flex justify-between">
+                                                                <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Booking Date:</span>
+                                                                <span className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{formatDate(selectedBooking.createdAt)}</span>
+                                                            </div>
+                                                            <div className="flex justify-between">
+                                                                <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Event Date:</span>
+                                                                <span className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{formatDate(selectedBooking.eventDate)}</span>
+                                                            </div>
+                                                            <div className="flex justify-between">
+                                                                <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Payment Method:</span>
+                                                                <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                                                    selectedBooking.paymentMethod === 'fib' ? 'bg-green-100 text-green-800' :
+                                                                    selectedBooking.paymentMethod === 'fastpay' ? 'bg-pink-100 text-pink-800' :
+                                                                    selectedBooking.paymentMethod === 'cash' ? 'bg-yellow-100 text-yellow-800' :
+                                                                    'bg-gray-100 text-gray-800'
+                                                                }`}>
+                                                                    {selectedBooking.paymentMethod === 'fib' ? 'FIB Bank' :
+                                                                    selectedBooking.paymentMethod === 'fastpay' ? 'FastPay' :
+                                                                    selectedBooking.paymentMethod === 'cash' ? 'Cash' :
+                                                                    selectedBooking.paymentMethod}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex justify-between">
+                                                                <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Total Price:</span>
+                                                                <span className={`font-medium text-green-500`}>${parseFloat(selectedBooking.totalPrice).toFixed(2)}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div>
+                                                    <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                                                        Address
+                                                    </h3>
+                                                    <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                                                        <p className={darkMode ? 'text-gray-200' : 'text-gray-800'}>{selectedBooking.address}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                        
+                                        {/* Service tab */}
+                                        {activeDetailsTab === 'service' && (
+                                            <div className="space-y-4">
+                                                <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                                                    Service Details
+                                                </h3>
+                                                
+                                                {selectedBooking.Post ? (
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                        <div>
+                                                            {selectedBooking.Post.image && (
+                                                                <div className="mb-4 rounded-lg overflow-hidden shadow-md">
+                                                                    <img 
+                                                                        src={selectedBooking.Post.image} 
+                                                                        alt={selectedBooking.Post.title} 
+                                                                        className="w-full h-56 object-cover rounded-md"
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <div className="space-y-4">
+                                                            <h4 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                                                                {selectedBooking.Post.title}
+                                                            </h4>
+                                                            <div className="flex flex-wrap gap-2">
+                                                                <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'}`}>
+                                                                    {selectedBooking.Post.category}
+                                                                </span>
+                                                                <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${darkMode ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-800'}`}>
+                                                                    Base Price: ${parseFloat(selectedBooking.Post.basePrice).toFixed(2)}
+                                                                </span>
+                                                            </div>
+                                                            {selectedBooking.Post.description && (
+                                                                <p className={`${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                                                                    {selectedBooking.Post.description}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className={`p-4 rounded-md ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                                                        <p className={darkMode ? 'text-gray-300' : 'text-gray-700'}>Service details not available</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                        
+                                        {/* Map tab */}
+                                        {activeDetailsTab === 'map' && (selectedBooking.latitude && selectedBooking.longitude) && (
+                                            <div className="space-y-4">
+                                                <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                                                    Customer Location
+                                                </h3>
+                                                <div className="rounded-lg overflow-hidden shadow-md">
+                                                    {isLoaded ? (
+                                                        <GoogleMap
+                                                            mapContainerStyle={mapContainerStyle}
+                                                            center={{
+                                                                lat: parseFloat(selectedBooking.latitude),
+                                                                lng: parseFloat(selectedBooking.longitude)
+                                                            }}
+                                                            zoom={15}
+                                                            options={mapOptions}
+                                                        >
+                                                            <Marker
+                                                                position={{
+                                                                    lat: parseFloat(selectedBooking.latitude),
+                                                                    lng: parseFloat(selectedBooking.longitude)
+                                                                }}
+                                                                icon={{
+                                                                    url: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='36px' height='36px'%3E%3Cpath fill='%23F97316' d='M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z'/%3E%3C/svg%3E",
+                                                                    scaledSize: { width: 36, height: 36 },
+                                                                    origin: { x: 0, y: 0 },
+                                                                    anchor: { x: 18, y: 36 },
+                                                                }}
+                                                            />
+                                                        </GoogleMap>
+                                                    ) : (
+                                                        <div className={`h-[300px] flex items-center justify-center ${darkMode ? 'bg-gray-700' : 'bg-gray-100'} rounded-md`}>
+                                                            <p className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Loading map...</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                                    Customer Address: {selectedBooking.address}
+                                                </p>
+                                            </div>
+                                        )}
+                                        
+                                        {/* Payment tab */}
+                                        {activeDetailsTab === 'payment' && selectedBooking.imageProof && (
+                                            <div className="space-y-4">
+                                                <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                                                    Payment Information
+                                                </h3>
+                                                
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                    <div>
+                                                        <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                                                            <div className="flex justify-between items-center mb-4">
+                                                                <span className={darkMode ? 'text-gray-300' : 'text-gray-700'}>Total Amount:</span>
+                                                                <span className="text-xl font-bold text-green-500">${parseFloat(selectedBooking.totalPrice).toFixed(2)}</span>
+                                                            </div>
+                                                            <div className="flex justify-between items-center">
+                                                                <span className={darkMode ? 'text-gray-300' : 'text-gray-700'}>Payment Method:</span>
+                                                                <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                                                    selectedBooking.paymentMethod === 'fib' ? 'bg-green-100 text-green-800' :
+                                                                    selectedBooking.paymentMethod === 'fastpay' ? 'bg-pink-100 text-pink-800' :
+                                                                    selectedBooking.paymentMethod === 'cash' ? 'bg-yellow-100 text-yellow-800' :
+                                                                    'bg-gray-100 text-gray-800'
+                                                                }`}>
+                                                                    {selectedBooking.paymentMethod === 'fib' ? 'FIB Bank' :
+                                                                    selectedBooking.paymentMethod === 'fastpay' ? 'FastPay' :
+                                                                    selectedBooking.paymentMethod === 'cash' ? 'Cash' :
+                                                                    selectedBooking.paymentMethod}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div>
+                                                        <div className="space-y-2">
+                                                            <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Payment Proof:</p>
+                                                            <div className="flex justify-center rounded-lg overflow-hidden border border-gray-300">
+                                                                <img 
+                                                                    src={`http://localhost:3001${selectedBooking.imageProof}`} 
+                                                                    alt="Payment Proof" 
+                                                                    className="h-48 object-contain cursor-pointer hover:opacity-90 transition-opacity"
+                                                                    onClick={() => setShowImageModal(true)}
+                                                                />
+                                                            </div>
+                                                            <p className={`text-center text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                                                Click to view larger image
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Image Modal */}
+                        {showImageModal && selectedBooking && selectedBooking.imageProof && (
+                            <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center">
+                                <div 
+                                    className="fixed inset-0 bg-black bg-opacity-75 transition-opacity" 
+                                    onClick={() => setShowImageModal(false)}
+                                ></div>
+                                <div className="relative z-50 max-w-screen-md max-h-screen-md p-2">
+                                    <div className="flex justify-end mb-2">
                                         <button 
-                                            onClick={() => setIsViewingBookingDetails(false)}
-                                            className={`${darkMode ? 'text-gray-300 hover:text-gray-100' : 'text-gray-400 hover:text-gray-500'}`}
+                                            onClick={() => setShowImageModal(false)}
+                                            className="bg-gray-800 bg-opacity-50 rounded-full p-2 text-white hover:bg-opacity-75"
                                         >
                                             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                                             </svg>
                                         </button>
                                     </div>
-                                    
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div>
-                                            <h4 className={`font-medium ${darkMode ? 'text-gray-200' : 'text-gray-800'} mb-3`}>Booking Information</h4>
-                                            <div className="space-y-3 text-sm">
-                                                <div className="flex justify-between">
-                                                    <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Booking Date:</span>
-                                                    <span>{formatDate(selectedBooking.createdAt)}</span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Event Date:</span>
-                                                    <span>{formatDate(selectedBooking.eventDate)}</span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Status:</span>
-                                                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                                                        selectedBooking.status === 'completed' ? 'bg-green-500 text-white' :
-                                                        selectedBooking.status === 'confirmed' ? 'bg-blue-500 text-white' :
-                                                        selectedBooking.status === 'pending' ? 'bg-yellow-500 text-white' :
-                                                        selectedBooking.status === 'cancelled' ? 'bg-red-500 text-white' :
-                                                        'bg-gray-500 text-white'
-                                                    }`}>
-                                                        {selectedBooking.status.charAt(0).toUpperCase() + selectedBooking.status.slice(1)}
-                                                    </span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Total Price:</span>
-                                                    <span className="font-medium">${parseFloat(selectedBooking.totalPrice).toFixed(2)}</span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Payment Method:</span>
-                                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                                        selectedBooking.paymentMethod === 'fib' ? 'bg-green-100 text-green-800' :
-                                                        selectedBooking.paymentMethod === 'fastpay' ? 'bg-pink-100 text-pink-800' :
-                                                        selectedBooking.paymentMethod === 'cash' ? 'bg-yellow-100 text-yellow-800' :
-                                                        'bg-gray-100 text-gray-800'
-                                                    }`}>
-                                                        {selectedBooking.paymentMethod === 'fib' ? 'FIB Bank' :
-                                                         selectedBooking.paymentMethod === 'fastpay' ? 'FastPay' :
-                                                         selectedBooking.paymentMethod === 'cash' ? 'Cash' :
-                                                         selectedBooking.paymentMethod}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        
-                                        <div>
-                                            <h4 className={`font-medium ${darkMode ? 'text-gray-200' : 'text-gray-800'} mb-3`}>Contact Information</h4>
-                                            <div className="space-y-3 text-sm">
-                                                {selectedBooking.User && (
-                                                <div>
-                                                    <div className="flex justify-between">
-                                                        <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Username:</span>
-                                                        <span>{selectedBooking.User.username}</span>
-                                                    </div>
-                                                    <div className="flex justify-between">
-                                                        <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Email:</span>
-                                                        <span>{selectedBooking.User.email}</span>
-                                                    </div>
-                                                </div>
-                                                )}
-                                                <div className="flex justify-between">
-                                                    <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Phone:</span>
-                                                    <span>{selectedBooking.phoneNumber}</span>
-                                                </div>
-                                                <div>
-                                                    <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} block mb-1`}>Address:</span>
-                                                    <span className="block text-right">{selectedBooking.address}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    {selectedBooking.Post && (
-                                        <div className={`mt-6 border-t pt-4 ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-                                            <h4 className={`font-medium ${darkMode ? 'text-gray-200' : 'text-gray-800'} mb-3`}>Service Details</h4>
-                                            <div className="flex flex-col md:flex-row">
-                                                {selectedBooking.Post.image && (
-                                                    <div className="md:w-1/3 mb-4 md:mb-0 md:mr-4">
-                                                        <img 
-                                                            src={selectedBooking.Post.image} 
-                                                            alt={selectedBooking.Post.title} 
-                                                            className="w-full h-32 object-cover rounded-lg"
-                                                        />
-                                                    </div>
-                                                )}
-                                                <div className="md:w-2/3">
-                                                    <h5 className="text-lg font-medium">{selectedBooking.Post.title}</h5>
-                                                    <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full mb-2">
-                                                        {selectedBooking.Post.category}
-                                                    </span>
-                                                    <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{selectedBooking.Post.description}</p>
-                                                    <p className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mt-2`}>
-                                                        Base Price: ${parseFloat(selectedBooking.Post.basePrice).toFixed(2)}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-                                    
-                                    <div className="mt-6 flex justify-end space-x-4">
-                                        <button
-                                            onClick={() => setIsViewingBookingDetails(false)}
-                                            className={`px-4 py-2 ${darkMode ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'} rounded-lg`}
-                                        >
-                                            Close
-                                        </button>
-                                        
-                                        {/* Status Change Dropdown */}
-                                        <div className="flex items-center">
-                                            <select
-                                                value={newStatus}
-                                                onChange={(e) => setNewStatus(e.target.value)}
-                                                className={`mr-2 px-3 py-2 border ${darkMode ? 'bg-gray-700 text-white border-gray-600 focus:ring-blue-400' : 'border-gray-300 focus:ring-blue-500'} rounded-md text-sm focus:outline-none focus:ring-2`}
-                                                disabled={isUpdatingStatus}
-                                            >
-                                                <option value="">Change Status</option>
-                                                <option value="pending">Pending</option>
-                                                <option value="confirmed">Confirmed</option>
-                                                <option value="completed">Complete</option>
-                                                <option value="cancelled">Cancelled</option>
-                                            </select>
-                                            
-                                            <button
-                                                onClick={() => {
-                                                    if (newStatus && newStatus !== selectedBooking.status) {
-                                                        updateBookingStatus(selectedBooking.id, newStatus);
-                                                    }
-                                                }}
-                                                disabled={!newStatus || newStatus === selectedBooking.status || isUpdatingStatus}
-                                                className={`px-4 py-2 rounded-lg text-white ${
-                                                    !newStatus || newStatus === selectedBooking.status || isUpdatingStatus
-                                                    ? 'bg-gray-400 cursor-not-allowed'
-                                                    : 'bg-blue-500 hover:bg-blue-600'
-                                                }`}
-                                            >
-                                                {isUpdatingStatus ? 'Updating...' : 'Update'}
-                                            </button>
-                                        </div>
-                                        
-                                        {selectedBooking.status === 'pending' && (
-                                            <button
-                                                onClick={() => {
-                                                    cancelBooking(selectedBooking.id);
-                                                    setIsViewingBookingDetails(false);
-                                                }}
-                                                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
-                                            >
-                                                Cancel Booking
-                                            </button>
-                                        )}
-                                    </div>
+                                    <img 
+                                        src={`http://localhost:3001${selectedBooking.imageProof}`} 
+                                        alt="Payment Proof" 
+                                        className="mx-auto max-h-[80vh] max-w-full object-contain rounded-lg"
+                                    />
                                 </div>
                             </div>
                         )}
